@@ -1,10 +1,12 @@
 #pragma once
 
+#include <memory>
+
 namespace gfx::rhi {
 
 class Device {
  public:
-  ~Device();
+  virtual ~Device() = default;
   virtual void init() = 0;
 };
 
@@ -12,6 +14,6 @@ class Device {
 
 namespace gfx {
 
-rhi::Device make_device();
+std::unique_ptr<rhi::Device> make_device();
 
 }

@@ -1,8 +1,5 @@
 #include "MetalDevice.hpp"
 
-#include <Metal/MTLDevice.hpp>
-#include <Metal/Metal.hpp>
-
 #include "core/EAssert.hpp"
 
 namespace gfx::metal {

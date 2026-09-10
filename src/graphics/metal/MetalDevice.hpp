@@ -5,6 +5,8 @@
 #include <Foundation/NSSharedPtr.hpp>
 // clang-format on
 
+#include <Metal/Metal.hpp>
+
 #include "graphics/rhi/Device.hpp"
 
 namespace MTL {
@@ -15,7 +17,7 @@ namespace gfx::metal {
 
 class MetalDevice : public gfx::rhi::Device {
  public:
-  ~MetalDevice();
+  ~MetalDevice() override;
   void init() override;
 
  private:

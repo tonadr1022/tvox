@@ -6,8 +6,7 @@
 #include "graphics/rhi/Device.hpp"
 #include "platform/Window.hpp"
 
-App::App()
-    : window_(create_window()), device_(std::make_unique<gfx::rhi::Device>(gfx::make_device())) {
+App::App() : window_(create_window()), device_(gfx::make_device()) {
   if (!SDL_Init(SDL_INIT_VIDEO)) {
     LINFO("failed to initialize SDL: {}", SDL_GetError());
     std::exit(1);

@@ -4,6 +4,8 @@ add_executable(${target_name}
 main.cpp
 App.cpp
 platform/Window.cpp
+
+graphics/rhi/Device.cpp
 )
 
 set(BUILD_METAL ON)
@@ -11,9 +13,8 @@ set(BUILD_METAL ON)
 if (${BUILD_METAL})
     target_sources(${target_name} PRIVATE
         platform/apple/AppleWindow.mm
-        platform/apple/AppleWindow.hpp
         graphics/metal/MetalDevice.cpp
-        graphics/metal/MetalDevice.hpp
+        graphics/metal/MetalCpp.cpp
     )
 endif()
 

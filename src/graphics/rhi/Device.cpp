@@ -1,6 +1,6 @@
 #include "Device.hpp"
 
-#include "core/Logger.hpp"
+#include "core/Logger.hpp"  // IWYU pragma: keep
 
 #ifdef __APPLE__
 #include "graphics/metal/MetalDevice.hpp"
@@ -8,12 +8,13 @@
 
 namespace gfx {
 
-rhi::Device make_device() {
+std::unique_ptr<rhi::Device> make_device() {
 #ifdef __APPLE__
-  return metal::MetalDevice{};
+  return std::make_unique<metal::MetalDevice>();
 #else
   LCRITICAL("Unsupported OS");
+  std::exit(1);
 #endif
 }
 
-} // namespace gfx
+}  // namespace gfx
