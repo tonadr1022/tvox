@@ -8,6 +8,12 @@
 
 namespace gfx {
 
+namespace rhi {
+
+Device::~Device() = default;
+
+}
+
 std::unique_ptr<rhi::Device> make_device() {
 #ifdef __APPLE__
   return std::make_unique<metal::MetalDevice>();

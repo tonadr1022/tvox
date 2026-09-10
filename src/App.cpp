@@ -3,10 +3,9 @@
 #include <SDL3/SDL.h>
 
 #include "core/Logger.hpp"
-#include "graphics/rhi/Device.hpp"
 #include "platform/Window.hpp"
 
-App::App() : window_(create_window()), device_(gfx::make_device()) {
+App::App() : window_(create_window()) {
   if (!SDL_Init(SDL_INIT_VIDEO)) {
     LINFO("failed to initialize SDL: {}", SDL_GetError());
     std::exit(1);
@@ -15,12 +14,14 @@ App::App() : window_(create_window()), device_(gfx::make_device()) {
 
   window_.init();
   SDL_PumpEvents();
+
+  renderer_.init();
 }
 
 void App::run() {
   bool close_requested{};
   while (!close_requested) {
-    SDL_Event event;
+    SDL_Event event{};
     while (SDL_PollEvent(&event)) {
       switch (event.type) {
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
@@ -32,6 +33,8 @@ void App::run() {
           continue;
       }
     }
+
+    renderer_.render();
   }
 
   shutdown();

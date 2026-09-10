@@ -5,6 +5,8 @@ main.cpp
 App.cpp
 platform/Window.cpp
 
+graphics/Renderer.cpp
+
 graphics/rhi/Device.cpp
 )
 
@@ -19,9 +21,13 @@ if (${BUILD_METAL})
 endif()
 
 target_link_libraries(${target_name} PRIVATE
-METAL_CPP
-SDL3::SDL3
+    METAL_CPP
+    SDL3::SDL3
 )
 
-target_include_directories(${target_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(${target_name} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/third_party/vendored
+)
+
 
