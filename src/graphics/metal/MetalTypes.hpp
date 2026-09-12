@@ -14,7 +14,6 @@ class MetalLayer;
 
 struct Swapchain_Metal {
   NS::SharedPtr<CA::MetalLayer> layer;
-  NS::SharedPtr<MTL::Drawable> curr_drawable;
   NS::SharedPtr<MTL::Texture> curr_texture;
 };
 

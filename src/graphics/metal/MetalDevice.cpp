@@ -35,16 +35,20 @@ void MetalDevice::init() {
 void MetalDevice::create_swapchain(const rhi::SwapchainDesc& desc, rhi::Swapchain& swapchain) {
   // TODO: reset existing swapchain state
   ASSERT(!swapchain.internal_data);
+  swapchain.desc = desc;
   swapchain.internal_data = wi::allocator::make_shared<Swapchain_Metal>();
   auto* internal_data = to_internal(swapchain);
 
   if (!internal_data->layer) {
     internal_data->layer = NS::TransferPtr(CA::MetalLayer::layer());
     auto* layer = internal_data->layer.get();
-    layer = internal_data->layer.get();
     layer->setDevice(device_.get());
+    layer->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    layer->setFramebufferOnly(true);
     layer->setDisplaySyncEnabled(true);
     layer->setMaximumDrawableCount(3);
+
+    queue_->addResidencySet(layer->residencySet());
   }
 
   auto* layer = internal_data->layer.get();
@@ -56,6 +60,7 @@ void MetalDevice::create_swapchain(const rhi::SwapchainDesc& desc, rhi::Swapchai
 
 rhi::CmdEncoder* MetalDevice::begin_cmd_encoder() {
   auto& frame = curr_frame();
+  frame.cmd_allocator->reset();
   frame.cmd_buf->beginCommandBuffer(frame.cmd_allocator.get());
   frame.cmd_buffers_allocated++;
   return &frame.cmd_encoder.value();
@@ -75,17 +80,21 @@ void MetalDevice::submit_queue() {
       frame.cmd_buf.get(),
   };
 
+  for (auto& drawable : frame.cmd_encoder->presents_) {
+    queue_->wait(drawable.get());
+  }
+
   queue_->commit(submit_cmd_buffers, ARRAY_SIZE(submit_cmd_buffers));
+
+  for (auto& drawable : frame.cmd_encoder->presents_) {
+    queue_->signalDrawable(drawable.get());
+    drawable->present();
+  }
+  frame.cmd_encoder->presents_.clear();
 
   // signal fence for the frame after work is complete
   frame.fence_value++;
   queue_->signalEvent(frame.fence.get(), frame.fence_value);
-
-  // present submits now that frame is complete
-  for (auto& present : frame.cmd_encoder->presents_) {
-    present->present();
-  }
-  frame.cmd_encoder->presents_.clear();
 
   frame_num_++;
 
