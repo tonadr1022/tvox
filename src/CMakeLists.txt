@@ -8,6 +8,7 @@ platform/Window.cpp
 graphics/Renderer.cpp
 
 graphics/rhi/Device.cpp
+
 )
 
 set(BUILD_METAL ON)
@@ -16,6 +17,8 @@ if (${BUILD_METAL})
     target_sources(${target_name} PRIVATE
         platform/apple/AppleWindow.mm
         graphics/metal/MetalDevice.cpp
+        graphics/metal/MetalCmdEncoder.cpp
+        graphics/metal/MetalWindow.mm
         graphics/metal/MetalCpp.cpp
     )
 endif()
@@ -23,6 +26,7 @@ endif()
 target_link_libraries(${target_name} PRIVATE
     METAL_CPP
     SDL3::SDL3
+    glm::glm
 )
 
 target_include_directories(${target_name} PRIVATE

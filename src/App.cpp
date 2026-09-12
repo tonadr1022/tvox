@@ -15,7 +15,7 @@ App::App() : window_(create_window()) {
   window_.init();
   SDL_PumpEvents();
 
-  renderer_.init();
+  renderer_.init(window_.get_window());
 }
 
 void App::run() {
