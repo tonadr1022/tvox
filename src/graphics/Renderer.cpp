@@ -3,29 +3,11 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_video.h>
 
-#include <fstream>
-
-#include "core/EAssert.hpp"
+#include "core/FileIo.hpp"
+#include "core/Logger.hpp"
 #include "graphics/rhi/CmdEncoder.hpp"
 #include "graphics/rhi/Device.hpp"
 #include "graphics/rhi/Graphics.hpp"
-
-namespace {
-
-std::vector<char> read_file_to_bytes(const std::string& path) {
-  std::ifstream file(path, std::ios::binary | std::ios::ate);
-  std::vector<char> bytes;
-  if (!file.is_open()) {
-    return bytes;
-  }
-  auto file_size = file.tellg();
-  file.seekg(0, std::ios::beg);
-  bytes.resize(file_size);
-  file.read(bytes.data(), file_size);
-  return bytes;
-}
-
-}  // namespace
 
 namespace gfx {
 
@@ -34,10 +16,10 @@ Renderer::~Renderer() = default;
 
 void Renderer::init(const InitInfo& info) {
   window_ = info.window;
-  shader_dir_ = info.shader_dir;
 
   device_ = make_device();
   device_->init();
+
   {
     int w{}, h{};
     SDL_GetWindowSize(window_, &w, &h);
@@ -46,6 +28,14 @@ void Renderer::init(const InitInfo& info) {
         window_, swapchain_);
   }
 
+  FATAL_IF(info.shader_root.empty(), "shader_root is empty");
+  FATAL_IF(info.cache_root.empty(), "cache_root is empty");
+  shader_cache_.emplace(ShaderCache::CacheRoots{
+      .shader_root = info.shader_root,
+      .cache_root = info.cache_root,
+  });
+
+  // TODO: Metallib load-by-logical-id + entry-point wiring is the next todo.
   reload_shaders();
 }
 
@@ -70,6 +60,13 @@ void Renderer::render() {
 }
 
 void Renderer::reload_shaders() {
+  const auto stats = shader_cache_->ensure_all();
+  LINFO("shader cache: {} compiled, {} up to date, {} failed", stats.compiled, stats.up_to_date,
+        stats.failed);
+  if (stats.failed > 0) {
+    LERROR("shader ensure_all failed: {}", stats.first_error);
+  }
+
   struct Job {
     rhi::Shader* shader;
     std::string path;
@@ -78,14 +75,19 @@ void Renderer::reload_shaders() {
                 Job{.shader = &basic_fs_, .path = "basic.fs"}};
 
   for (auto& job : jobs) {
-    std::filesystem::path full_path = shader_dir_ / job.path;
-    load_shader(*job.shader, full_path);
+    // TODO: Fix
+    // std::filesystem::path full_path = shader_root_ / job.path;
+    // load_shader(*job.shader, full_path.string());
   }
 }
 
 void Renderer::load_shader(rhi::Shader& shader, const std::string& path) {
-  auto bytes = read_file_to_bytes(path);
-  ASSERT(bytes.size());
+  std::vector<uint8_t> bytes;
+  std::string error;
+  if (!core::read_bytes(path, bytes, error)) {
+    LERROR("{}", error);
+    return;
+  }
 
   rhi::ShaderType type{rhi::ShaderType::None};
   if (path.ends_with(".vs")) {
@@ -104,9 +106,7 @@ void Renderer::load_shader(rhi::Shader& shader, const std::string& path) {
     type = rhi::ShaderType::Compute;
   }
 
-  if (bytes.size()) {
-    device_->create_shader(type, bytes.data(), bytes.size(), shader);
-  }
+  device_->create_shader(type, bytes.data(), bytes.size(), shader);
 }
 
 }  // namespace gfx

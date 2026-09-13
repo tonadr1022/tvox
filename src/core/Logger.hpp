@@ -16,3 +16,11 @@
       ASSERT(cond);                  \
     }                                \
   }
+
+#define FATAL_IF(expr, ...)   \
+  do {                        \
+    if (!(expr)) {            \
+      LCRITICAL(__VA_ARGS__); \
+      std::abort();           \
+    }                         \
+  } while (0)

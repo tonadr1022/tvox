@@ -3,10 +3,11 @@
 #include <metal_irconverter/metal_irconverter.h>
 
 #include <mutex>
+#include <string>
 
 #include "core/DynamicLib.hpp"
 
-namespace gfx::shaders {
+namespace gfx {
 namespace {
 
 IRShaderStage ir_stage_for(ShaderStage stage) {
@@ -28,7 +29,7 @@ IRShaderStage ir_stage_for(ShaderStage stage) {
 struct MetalIrSymbols {
   core::DynamicLib lib;
   std::string load_error;
-  std::string version{"loaded"};
+  std::string version;
 
 #define TVOX_IR_FN(name) decltype (&(name))(name){nullptr};
   TVOX_IR_FN(IRCompilerCreate)
@@ -89,6 +90,8 @@ struct MetalIrSymbols {
     TVOX_IR_LOAD(IRRootSignatureCreateFromDescriptor);
 #undef TVOX_IR_LOAD
 
+    version = std::to_string(IR_VERSION_MAJOR) + "." + std::to_string(IR_VERSION_MINOR) + "." +
+              std::to_string(IR_VERSION_PATCH);
     load_error.clear();
     return true;
   }
@@ -139,9 +142,9 @@ IRRootSignature* default_root_signature(MetalIrSymbols& ir, std::string& error) 
 
 }  // namespace
 
-bool convert_dxil_to_metallib(const CompileInput& input, const std::vector<uint8_t>& dxil,
+bool convert_dxil_to_metallib(const ShaderCompileInput& input, const std::vector<uint8_t>& dxil,
                               const std::vector<std::filesystem::path>& library_dirs,
-                              CompileOutput& out) {
+                              ShaderCompileOutput& out) {
   MetalIrSymbols& ir = metal_ir(library_dirs);
   if (!ir.ok()) {
     out.error_message =
@@ -207,4 +210,16 @@ bool convert_dxil_to_metallib(const CompileInput& input, const std::vector<uint8
   return true;
 }
 
-}  // namespace gfx::shaders
+bool query_metal_ir_version(const std::vector<std::filesystem::path>& library_dirs,
+                            std::string& version, std::string& error) {
+  MetalIrSymbols& ir = metal_ir(library_dirs);
+  if (!ir.ok()) {
+    error = ir.load_error.empty() ? "Metal IR Converter is not available" : ir.load_error;
+    return false;
+  }
+  version = ir.version;
+  error.clear();
+  return true;
+}
+
+}  // namespace gfx

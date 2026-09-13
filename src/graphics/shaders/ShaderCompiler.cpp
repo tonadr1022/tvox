@@ -2,18 +2,18 @@
 
 #include <clocale>
 #include <cstring>
-#include <fstream>
 #include <mutex>
 #include <string_view>
 
 #include "core/DynamicLib.hpp"
+#include "core/FileIo.hpp"
 #include "core/Paths.hpp"
 #include "graphics/shaders/MetalIrConverter.hpp"
 
 #define ComPtr CComPtr
 #include <dxcapi.h>
 
-namespace gfx::shaders {
+namespace gfx {
 namespace {
 
 using DxcCreateInstanceFn = HRESULT (*)(REFCLSID, REFIID, LPVOID*);
@@ -117,28 +117,8 @@ DxcState& dxc_state() {
   return state;
 }
 
-bool read_file(const std::filesystem::path& path, std::vector<uint8_t>& out, std::string& error) {
-  std::ifstream file(path, std::ios::binary);
-  if (!file) {
-    error = "Failed to read shader source: " + path.string();
-    return false;
-  }
-  file.seekg(0, std::ios::end);
-  const std::streamoff size = file.tellg();
-  if (size < 0) {
-    error = "Failed to size shader source: " + path.string();
-    return false;
-  }
-  file.seekg(0, std::ios::beg);
-  out.resize(static_cast<size_t>(size));
-  if (size > 0 && !file.read(reinterpret_cast<char*>(out.data()), size)) {
-    error = "Failed to read shader source bytes: " + path.string();
-    return false;
-  }
-  return true;
-}
-
-bool compile_dxil(const CompileInput& input, CompileOutput& out, std::vector<uint8_t>& dxil) {
+bool compile_dxil(const ShaderCompileInput& input, ShaderCompileOutput& out,
+                  std::vector<uint8_t>& dxil) {
   DxcState& dxc = dxc_state();
   if (!dxc.create_instance) {
     out.error_message = dxc.load_error.empty() ? "DXC is not available" : dxc.load_error;
@@ -147,7 +127,7 @@ bool compile_dxil(const CompileInput& input, CompileOutput& out, std::vector<uin
   out.dxc_version = dxc.version;
 
   std::vector<uint8_t> source;
-  if (!read_file(input.source_path, source, out.error_message)) {
+  if (!core::read_bytes(input.source_path, source, out.error_message)) {
     return false;
   }
 
@@ -299,8 +279,24 @@ void set_library_search_paths(std::vector<std::filesystem::path> paths) {
   g_extra_search_paths = std::move(paths);
 }
 
-bool compile(const CompileInput& input, CompileOutput& out) {
-  out = CompileOutput{};
+ShaderToolVersions query_shader_tool_versions() {
+  ShaderToolVersions versions;
+  DxcState& dxc = dxc_state();
+  if (!dxc.create_instance) {
+    versions.error_message = dxc.load_error.empty() ? "DXC is not available" : dxc.load_error;
+    return versions;
+  }
+  versions.dxc = dxc.version;
+
+  if (!query_metal_ir_version(library_search_paths(), versions.metal_ir_converter,
+                              versions.error_message)) {
+    return versions;
+  }
+  return versions;
+}
+
+bool compile(const ShaderCompileInput& input, ShaderCompileOutput& out) {
+  out = ShaderCompileOutput{};
   if (input.source_path.empty()) {
     out.error_message = "CompileInput.source_path is empty";
     return false;
@@ -319,4 +315,4 @@ bool compile(const CompileInput& input, CompileOutput& out) {
   return convert_dxil_to_metallib(input, dxil, library_search_paths(), out);
 }
 
-}  // namespace gfx::shaders
+}  // namespace gfx

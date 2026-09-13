@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include "core/Logger.hpp"
+#include "core/Paths.hpp"
 #include "graphics/Renderer.hpp"
 #include "platform/Window.hpp"
 
@@ -16,7 +17,18 @@ App::App() : window_(create_window()) {
   window_.init();
   SDL_PumpEvents();
 
-  renderer_.init(gfx::Renderer::InitInfo{.window = window_.get_window(), .shader_dir = ""});
+  const std::filesystem::path project_root = core::resolve_project_root();
+  FATAL_IF(project_root.empty(),
+           "could not locate project root (resources/shaders); shaders will not cook");
+  LINFO("project root: {}", project_root.string());
+
+  auto resources_root = project_root / "resources";
+
+  renderer_.init(gfx::Renderer::InitInfo{
+      .window = window_.get_window(),
+      .shader_root = resources_root / "shaders",
+      .cache_root = resources_root / "shader_cache",
+  });
 }
 
 void App::run() {
