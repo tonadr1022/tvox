@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include "core/Logger.hpp"
+#include "graphics/Renderer.hpp"
 #include "platform/Window.hpp"
 
 App::App() : window_(create_window()) {
@@ -15,7 +16,7 @@ App::App() : window_(create_window()) {
   window_.init();
   SDL_PumpEvents();
 
-  renderer_.init(window_.get_window());
+  renderer_.init(gfx::Renderer::InitInfo{.window = window_.get_window(), .shader_dir = ""});
 }
 
 void App::run() {
