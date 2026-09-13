@@ -98,7 +98,7 @@ void Renderer::load_shader(rhi::Shader& shader, std::string_view technique, rhi:
 
   std::vector<uint8_t> bytes;
   std::string error;
-  if (!shader_cache_->load_metallib(technique, stage, bytes, &error)) {
+  if (!shader_cache_->load_shader(technique, stage, bytes, &error)) {
     LERROR("failed to load metallib for {} / {}: {}", technique, stage_desc->entry, error);
     return;
   }

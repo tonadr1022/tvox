@@ -229,7 +229,8 @@ bool make_unit(const ShaderCache::CacheRoots& roots, std::string_view technique_
   return false;
 }
 
-bool is_outdated(const ShaderCache::CacheRoots& roots, const CacheUnit& unit, std::string* reason) {
+bool unit_is_outdated(const ShaderCache::CacheRoots& roots, const CacheUnit& unit,
+                      std::string* reason) {
   const auto metallib = metallib_path(roots, unit);
   const auto meta = meta_path(roots, unit);
   std::error_code ec;
@@ -309,7 +310,7 @@ bool ensure_unit(const ShaderCache::CacheRoots& roots, const CacheUnit& unit, bo
                  std::string* error) {
   if (!force) {
     std::string reason;
-    if (!is_outdated(roots, unit, &reason)) {
+    if (!unit_is_outdated(roots, unit, &reason)) {
       return true;
     }
     LINFO("shader outdated ({}): {} / {}", reason, unit.technique_name, unit.entry);
@@ -390,48 +391,105 @@ ShaderCache::ShaderCache(ShaderCache::CacheRoots roots) : roots_(std::move(roots
 ShaderCache::EnsureStats ShaderCache::ensure_all(bool force) {
   EnsureStats stats;
   for (const ShaderTechniqueDesc& tech : ShaderTechniqueRegistry::all()) {
-    for (const ShaderTechniqueDesc::StageDesc& stage : tech.stages) {
-      CacheUnit unit;
-      std::string error;
-      if (!make_unit(roots_, tech, stage, unit, &error)) {
-        ++stats.failed;
-        if (stats.first_error.empty()) {
-          stats.first_error = error;
-        }
-        LERROR("{}", error);
-        continue;
-      }
-
-      std::string reason;
-      const bool outdated = force || is_outdated(roots_, unit, &reason);
-      if (!outdated) {
-        ++stats.up_to_date;
-        continue;
-      }
-
-      if (!ensure_unit(roots_, unit, /*force=*/true, &error)) {
-        ++stats.failed;
-        if (stats.first_error.empty()) {
-          stats.first_error = error;
-        }
-        LERROR("Failed to compile {} / {}: {}", unit.technique_name, unit.entry, error);
-        continue;
-      }
-      ++stats.compiled;
+    EnsureStats one = ensure_technique(tech.name, force);
+    stats.compiled += one.compiled;
+    stats.up_to_date += one.up_to_date;
+    stats.failed += one.failed;
+    if (stats.first_error.empty()) {
+      stats.first_error = std::move(one.first_error);
     }
   }
   return stats;
 }
 
-bool ShaderCache::load_metallib(std::string_view technique, rhi::ShaderType stage,
-                                std::vector<uint8_t>& out, std::string* error) const {
+ShaderCache::EnsureStats ShaderCache::ensure_technique(std::string_view name, bool force) {
+  EnsureStats stats;
+  const ShaderTechniqueDesc* tech = ShaderTechniqueRegistry::find(name);
+  if (!tech) {
+    ++stats.failed;
+    stats.first_error = "Unknown technique: " + std::string(name);
+    LERROR("{}", stats.first_error);
+    return stats;
+  }
+
+  for (const ShaderTechniqueDesc::StageDesc& stage : tech->stages) {
+    CacheUnit unit;
+    std::string error;
+    if (!make_unit(roots_, *tech, stage, unit, &error)) {
+      ++stats.failed;
+      if (stats.first_error.empty()) {
+        stats.first_error = error;
+      }
+      LERROR("{}", error);
+      continue;
+    }
+
+    std::string reason;
+    const bool outdated = force || unit_is_outdated(roots_, unit, &reason);
+    if (!outdated) {
+      ++stats.up_to_date;
+      continue;
+    }
+
+    if (!ensure_unit(roots_, unit, /*force=*/true, &error)) {
+      ++stats.failed;
+      if (stats.first_error.empty()) {
+        stats.first_error = error;
+      }
+      LERROR("Failed to compile {} / {}: {}", unit.technique_name, unit.entry, error);
+      continue;
+    }
+    ++stats.compiled;
+  }
+  return stats;
+}
+
+bool ShaderCache::is_outdated(std::string_view technique, rhi::ShaderType stage,
+                              std::string* reason) const {
+  CacheUnit unit;
+  std::string error;
+  if (!make_unit(roots_, technique, stage, unit, &error)) {
+    if (reason) {
+      *reason = error;
+    }
+    return true;
+  }
+  return unit_is_outdated(roots_, unit, reason);
+}
+
+void ShaderCache::register_loaded(std::string_view technique, rhi::ShaderType stage) {
+  std::scoped_lock lock(registered_mu_);
+  registered_shaders_.emplace(std::string(technique), stage);
+}
+
+size_t ShaderCache::registered_shader_count() const {
+  std::scoped_lock lock(registered_mu_);
+  return registered_shaders_.size();
+}
+
+bool ShaderCache::any_registered_outdated() const {
+  std::scoped_lock lock(registered_mu_);
+  for (const auto& [technique, stage] : registered_shaders_) {
+    if (is_outdated(technique, stage)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ShaderCache::load_shader(std::string_view technique, rhi::ShaderType stage,
+                              std::vector<uint8_t>& out, std::string* error) {
   CacheUnit unit;
   std::string local_error;
   std::string& err = error ? *error : local_error;
   if (!make_unit(roots_, technique, stage, unit, &err)) {
     return false;
   }
-  return core::read_bytes(metallib_path(roots_, unit), out, err);
+  if (!core::read_bytes(metallib_path(roots_, unit), out, err)) {
+    return false;
+  }
+  register_loaded(technique, stage);
+  return true;
 }
 
 }  // namespace gfx

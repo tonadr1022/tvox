@@ -1,9 +1,8 @@
 #include "MetalDevice.hpp"
 
-#include <string>
-
 #include <Foundation/NSSharedPtr.hpp>
 #include <QuartzCore/CAMetalLayer.hpp>
+#include <string>
 
 #include "core/EAssert.hpp"
 #include "core/Logger.hpp"
@@ -72,7 +71,7 @@ void MetalDevice::create_pipeline(rhi::GraphicsPipelineCreateInfo&) {
 bool MetalDevice::create_shader(rhi::ShaderType type, const void* data, size_t size,
                                 rhi::Shader& shader, std::string_view entry_point) {
   bool success{true};
-  ASSERT(!shader.internal_data);
+  shader.internal_data.reset();
   shader.internal_data = wi::allocator::make_shared<Shader_Metal>();
   Shader_Metal* internal_data = to_internal(shader);
 
