@@ -1,12 +1,12 @@
 #include "Window.hpp"
 
+#include <SDL3/SDL.h>
+
 #include "apple/AppleWindow.hpp"
 #include "core/Logger.hpp"
 
-#include <SDL3/SDL.h>
-
 void Window::init() {
-  SDL_WindowFlags window_flags{SDL_WINDOW_HIGH_PIXEL_DENSITY};
+  SDL_WindowFlags window_flags{SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE};
 
 #ifdef __APPLE__
   window_flags |= SDL_WINDOW_METAL;

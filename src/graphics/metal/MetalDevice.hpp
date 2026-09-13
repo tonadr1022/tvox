@@ -24,7 +24,12 @@ class MetalDevice : public gfx::rhi::Device {
 
   void init() override;
 
-  void create_swapchain(const rhi::SwapchainDesc& desc, rhi::Swapchain& swapchain) override;
+  void create_swapchain(const rhi::SwapchainDesc& desc, SDL_Window* window,
+                        rhi::Swapchain& swapchain) override;
+  void create_pipeline(rhi::GraphicsPipelineCreateInfo& cinfo) override;
+  bool create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& pipeline) override;
+  bool create_shader(rhi::ShaderType type, const void* data, size_t size,
+                     rhi::Shader& shader) override;
 
   rhi::CmdEncoder* begin_cmd_encoder() override;
   void end_cmd_encoder(rhi::CmdEncoder* encoder) override;

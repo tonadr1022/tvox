@@ -2,6 +2,10 @@
 
 #include <memory>
 
+#include "graphics/rhi/Graphics.hpp"
+
+struct SDL_Window;
+
 namespace gfx::rhi {
 
 class CmdEncoder;
@@ -16,7 +20,12 @@ class Device {
 
   virtual void init() = 0;
 
-  virtual void create_swapchain(const rhi::SwapchainDesc& desc, rhi::Swapchain& swapchain) = 0;
+  virtual void create_swapchain(const rhi::SwapchainDesc& desc, SDL_Window* window,
+                                rhi::Swapchain& swapchain) = 0;
+  virtual void create_pipeline(rhi::GraphicsPipelineCreateInfo& cinfo) = 0;
+  virtual bool create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& pipeline) = 0;
+  virtual bool create_shader(rhi::ShaderType type, const void* data, size_t size,
+                             rhi::Shader& shader) = 0;
 
   virtual void submit_queue() = 0;
   virtual rhi::CmdEncoder* begin_cmd_encoder() = 0;
