@@ -1,10 +1,10 @@
-#include "shader_shared.h"
+#include "shader_shared.hlsli"
 
 struct VOut {
   float4 position : SV_Position;
 };
 
-VOut main(uint vert_idx : SV_VertexID) {
+VOut vs_main(uint vert_idx : SV_VertexID) {
   VOut output;
   if (vert_idx == 0) {
     output.position = float4(-0.5, -0.5, 0, 1);
@@ -13,4 +13,9 @@ VOut main(uint vert_idx : SV_VertexID) {
   } else {
     output.position = float4(0, 0.5, 0, 1);
   }
+  return output;
+}
+
+float4 fs_main(VOut input) : SV_Target0 {
+  return float4(1, 1, 1, 1);
 }
