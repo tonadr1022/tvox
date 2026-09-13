@@ -1,17 +1,17 @@
 #pragma once
 
-#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <vector>
-namespace gfx {
 
-enum class ShaderStage : uint8_t { Vertex, Fragment, Task, Mesh, Compute };
+#include "graphics/rhi/ShaderType.hpp"
+
+namespace gfx {
 
 // Vulkan/Spirv not supported yet
 struct ShaderCompileInput {
   std::filesystem::path source_path;
-  ShaderStage stage{ShaderStage::Vertex};
+  rhi::ShaderType stage{rhi::ShaderType::Vertex};
   std::string entry_point{"main"};
   std::vector<std::string> include_directories;
   std::vector<std::string> defines;

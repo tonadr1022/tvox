@@ -5,6 +5,8 @@
 #include <Foundation/NSSharedPtr.hpp>
 // clang-format on
 
+#include <string_view>
+
 #include <Metal/Metal.hpp>
 
 #include "graphics/metal/MetalCmdEncoder.hpp"
@@ -28,8 +30,8 @@ class MetalDevice : public gfx::rhi::Device {
                         rhi::Swapchain& swapchain) override;
   void create_pipeline(rhi::GraphicsPipelineCreateInfo& cinfo) override;
   bool create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& pipeline) override;
-  bool create_shader(rhi::ShaderType type, const void* data, size_t size,
-                     rhi::Shader& shader) override;
+  bool create_shader(rhi::ShaderType type, const void* data, size_t size, rhi::Shader& shader,
+                     std::string_view entry_point) override;
 
   rhi::CmdEncoder* begin_cmd_encoder() override;
   void end_cmd_encoder(rhi::CmdEncoder* encoder) override;

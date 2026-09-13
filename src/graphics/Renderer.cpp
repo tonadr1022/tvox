@@ -3,13 +3,26 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_video.h>
 
-#include "core/FileIo.hpp"
 #include "core/Logger.hpp"
 #include "graphics/rhi/CmdEncoder.hpp"
 #include "graphics/rhi/Device.hpp"
 #include "graphics/rhi/Graphics.hpp"
+#include "graphics/shaders/TechniqueRegistry.hpp"
 
 namespace gfx {
+namespace {
+
+const ShaderTechniqueDesc::StageDesc* find_stage(const ShaderTechniqueDesc& tech,
+                                                 rhi::ShaderType stage) {
+  for (const ShaderTechniqueDesc::StageDesc& desc : tech.stages) {
+    if (desc.stage == stage) {
+      return &desc;
+    }
+  }
+  return nullptr;
+}
+
+}  // namespace
 
 Renderer::Renderer() = default;
 Renderer::~Renderer() = default;
@@ -35,7 +48,6 @@ void Renderer::init(const InitInfo& info) {
       .cache_root = info.cache_root,
   });
 
-  // TODO: Metallib load-by-logical-id + entry-point wiring is the next todo.
   reload_shaders();
 }
 
@@ -67,46 +79,33 @@ void Renderer::reload_shaders() {
     LERROR("shader ensure_all failed: {}", stats.first_error);
   }
 
-  struct Job {
-    rhi::Shader* shader;
-    std::string path;
-  };
-  Job jobs[] = {Job{.shader = &basic_vs_, .path = "basic.vs"},
-                Job{.shader = &basic_fs_, .path = "basic.fs"}};
-
-  for (auto& job : jobs) {
-    // TODO: Fix
-    // std::filesystem::path full_path = shader_root_ / job.path;
-    // load_shader(*job.shader, full_path.string());
-  }
+  load_shader(basic_vs_, "basic", rhi::ShaderType::Vertex);
+  load_shader(basic_fs_, "basic", rhi::ShaderType::Fragment);
 }
 
-void Renderer::load_shader(rhi::Shader& shader, const std::string& path) {
-  std::vector<uint8_t> bytes;
-  std::string error;
-  if (!core::read_bytes(path, bytes, error)) {
-    LERROR("{}", error);
+void Renderer::load_shader(rhi::Shader& shader, std::string_view technique, rhi::ShaderType stage) {
+  const ShaderTechniqueDesc* tech = ShaderTechniqueRegistry::find(technique);
+  if (!tech) {
+    LERROR("unknown technique '{}'", technique);
     return;
   }
 
-  rhi::ShaderType type{rhi::ShaderType::None};
-  if (path.ends_with(".vs")) {
-    type = rhi::ShaderType::Vertex;
-  }
-  if (path.ends_with(".ms")) {
-    type = rhi::ShaderType::Mesh;
-  }
-  if (path.ends_with(".ts")) {
-    type = rhi::ShaderType::Task;
-  }
-  if (path.ends_with(".fs")) {
-    type = rhi::ShaderType::Fragment;
-  }
-  if (path.ends_with(".cs")) {
-    type = rhi::ShaderType::Compute;
+  const ShaderTechniqueDesc::StageDesc* stage_desc = find_stage(*tech, stage);
+  if (!stage_desc) {
+    LERROR("technique '{}' has no requested stage", technique);
+    return;
   }
 
-  device_->create_shader(type, bytes.data(), bytes.size(), shader);
+  std::vector<uint8_t> bytes;
+  std::string error;
+  if (!shader_cache_->load_metallib(technique, stage, bytes, &error)) {
+    LERROR("failed to load metallib for {} / {}: {}", technique, stage_desc->entry, error);
+    return;
+  }
+
+  if (!device_->create_shader(stage, bytes.data(), bytes.size(), shader, stage_desc->entry)) {
+    LERROR("create_shader failed for {} / {}", technique, stage_desc->entry);
+  }
 }
 
 }  // namespace gfx

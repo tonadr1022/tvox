@@ -40,35 +40,39 @@ std::string hash_to_hex(uint64_t hash) {
   return out;
 }
 
-const char* stage_name(ShaderStage stage) {
+const char* stage_name(rhi::ShaderType stage) {
   switch (stage) {
-    case ShaderStage::Vertex:
+    case rhi::ShaderType::Vertex:
       return "vertex";
-    case ShaderStage::Fragment:
+    case rhi::ShaderType::Fragment:
       return "fragment";
-    case ShaderStage::Compute:
+    case rhi::ShaderType::Compute:
       return "compute";
-    case ShaderStage::Mesh:
+    case rhi::ShaderType::Mesh:
       return "mesh";
-    case ShaderStage::Task:
+    case rhi::ShaderType::Task:
       return "task";
+    case rhi::ShaderType::None:
+      break;
   }
-  return "vertex";
+  return "none";
 }
 
 // TODO: use newer profile if possible
-const char* profile_for_stage(ShaderStage stage) {
+const char* profile_for_stage(rhi::ShaderType stage) {
   switch (stage) {
-    case ShaderStage::Vertex:
+    case rhi::ShaderType::Vertex:
       return "vs_6_6";
-    case ShaderStage::Fragment:
+    case rhi::ShaderType::Fragment:
       return "ps_6_6";
-    case ShaderStage::Compute:
+    case rhi::ShaderType::Compute:
       return "cs_6_6";
-    case ShaderStage::Mesh:
+    case rhi::ShaderType::Mesh:
       return "ms_6_6";
-    case ShaderStage::Task:
+    case rhi::ShaderType::Task:
       return "as_6_6";
+    case rhi::ShaderType::None:
+      break;
   }
   return "vs_6_6";
 }
@@ -77,7 +81,7 @@ const char* profile_for_stage(ShaderStage stage) {
 struct CacheUnit {
   std::string_view technique_name;
   std::filesystem::path source_path;
-  ShaderStage stage{ShaderStage::Vertex};
+  rhi::ShaderType stage{rhi::ShaderType::Vertex};
   std::string entry;
   std::vector<std::string> defines;
 };
@@ -206,7 +210,7 @@ bool make_unit(const ShaderCache::CacheRoots& roots, const ShaderTechniqueDesc& 
 }
 
 bool make_unit(const ShaderCache::CacheRoots& roots, std::string_view technique_name,
-               ShaderStage stage, CacheUnit& out, std::string* error) {
+               rhi::ShaderType stage, CacheUnit& out, std::string* error) {
   const ShaderTechniqueDesc* tech = ShaderTechniqueRegistry::find(technique_name);
   if (!tech) {
     if (error) {
@@ -419,7 +423,7 @@ ShaderCache::EnsureStats ShaderCache::ensure_all(bool force) {
   return stats;
 }
 
-bool ShaderCache::load_metallib(std::string_view technique, ShaderStage stage,
+bool ShaderCache::load_metallib(std::string_view technique, rhi::ShaderType stage,
                                 std::vector<uint8_t>& out, std::string* error) const {
   CacheUnit unit;
   std::string local_error;

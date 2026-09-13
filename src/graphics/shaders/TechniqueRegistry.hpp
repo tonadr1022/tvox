@@ -3,14 +3,14 @@
 #include <span>
 #include <string_view>
 
-#include "graphics/shaders/ShaderCompiler.hpp"
+#include "graphics/rhi/ShaderType.hpp"
 
 namespace gfx {
 
 /// One cookable technique. Permutations are separate rows
 struct ShaderTechniqueDesc {
   struct StageDesc {
-    ShaderStage stage{ShaderStage::Vertex};
+    rhi::ShaderType stage{rhi::ShaderType::Vertex};
     std::string_view entry{"main"};
   };
 

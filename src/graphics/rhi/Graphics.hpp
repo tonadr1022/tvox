@@ -2,6 +2,7 @@
 
 #include <glm/vec4.hpp>
 
+#include "graphics/rhi/ShaderType.hpp"
 #include "small_vector/small_vector.hpp"
 #include "wicked_engine/wiAllocator.h"
 
@@ -138,8 +139,6 @@ enum class BorderColor : uint8_t {
   FloatOpaqueWhite,
   IntOpaqueWhite
 };
-
-enum class ShaderType : uint8_t { None, Vertex, Fragment, Task, Mesh, Compute };
 
 struct ShaderCreateInfo {
   std::string path;

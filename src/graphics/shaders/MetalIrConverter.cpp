@@ -10,18 +10,20 @@
 namespace gfx {
 namespace {
 
-IRShaderStage ir_stage_for(ShaderStage stage) {
+IRShaderStage ir_stage_for(rhi::ShaderType stage) {
   switch (stage) {
-    case ShaderStage::Vertex:
+    case rhi::ShaderType::Vertex:
       return IRShaderStageVertex;
-    case ShaderStage::Fragment:
+    case rhi::ShaderType::Fragment:
       return IRShaderStageFragment;
-    case ShaderStage::Compute:
+    case rhi::ShaderType::Compute:
       return IRShaderStageCompute;
-    case ShaderStage::Mesh:
+    case rhi::ShaderType::Mesh:
       return IRShaderStageMesh;
-    case ShaderStage::Task:
+    case rhi::ShaderType::Task:
       return IRShaderStageAmplification;
+    case rhi::ShaderType::None:
+      break;
   }
   return IRShaderStageVertex;
 }

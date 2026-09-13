@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string_view>
 
 #include "graphics/rhi/Graphics.hpp"
 
@@ -24,8 +25,9 @@ class Device {
                                 rhi::Swapchain& swapchain) = 0;
   virtual void create_pipeline(rhi::GraphicsPipelineCreateInfo& cinfo) = 0;
   virtual bool create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& pipeline) = 0;
+  // empty entry_point -> "main"
   virtual bool create_shader(rhi::ShaderType type, const void* data, size_t size,
-                             rhi::Shader& shader) = 0;
+                             rhi::Shader& shader, std::string_view entry_point) = 0;
 
   virtual void submit_queue() = 0;
   virtual rhi::CmdEncoder* begin_cmd_encoder() = 0;

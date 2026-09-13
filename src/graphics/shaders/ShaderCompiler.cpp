@@ -57,18 +57,20 @@ std::vector<std::filesystem::path> library_search_paths() {
   return paths;
 }
 
-const char* profile_for_stage(ShaderStage stage) {
+const char* profile_for_stage(rhi::ShaderType stage) {
   switch (stage) {
-    case ShaderStage::Vertex:
+    case rhi::ShaderType::Vertex:
       return "vs_6_6";
-    case ShaderStage::Fragment:
+    case rhi::ShaderType::Fragment:
       return "ps_6_6";
-    case ShaderStage::Compute:
+    case rhi::ShaderType::Compute:
       return "cs_6_6";
-    case ShaderStage::Mesh:
+    case rhi::ShaderType::Mesh:
       return "ms_6_6";
-    case ShaderStage::Task:
+    case rhi::ShaderType::Task:
       return "as_6_6";
+    case rhi::ShaderType::None:
+      break;
   }
   return "vs_6_6";
 }

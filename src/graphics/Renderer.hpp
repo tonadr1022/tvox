@@ -2,6 +2,8 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
+#include <string_view>
 
 #include "graphics/rhi/Graphics.hpp"
 #include "graphics/shaders/ShaderCache.hpp"
@@ -25,7 +27,9 @@ class Renderer {
 
  private:
   void reload_shaders();
-  void load_shader(rhi::Shader& shader, const std::string& path);
+  /// Load a cooked metallib by logical technique id + stage (entry from registry).
+  void load_shader(rhi::Shader& shader, std::string_view technique, rhi::ShaderType stage);
+
   SDL_Window* window_{};
   std::optional<ShaderCache> shader_cache_;
   std::unique_ptr<gfx::rhi::Device> device_;

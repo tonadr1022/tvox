@@ -1,5 +1,7 @@
 #include "MetalDevice.hpp"
 
+#include <string>
+
 #include <Foundation/NSSharedPtr.hpp>
 #include <QuartzCore/CAMetalLayer.hpp>
 
@@ -68,7 +70,7 @@ void MetalDevice::create_pipeline(rhi::GraphicsPipelineCreateInfo&) {
 }
 
 bool MetalDevice::create_shader(rhi::ShaderType type, const void* data, size_t size,
-                                rhi::Shader& shader) {
+                                rhi::Shader& shader, std::string_view entry_point) {
   bool success{true};
   ASSERT(!shader.internal_data);
   shader.internal_data = wi::allocator::make_shared<Shader_Metal>();
@@ -87,13 +89,18 @@ bool MetalDevice::create_shader(rhi::ShaderType type, const void* data, size_t s
   }
 
   internal_data->library = library;
+  const std::string entry_name = entry_point.empty() ? "main" : std::string(entry_point);
   NS::SharedPtr<NS::String> entry =
-      NS::TransferPtr(NS::String::alloc()->init("main", NS::UTF8StringEncoding));
+      NS::TransferPtr(NS::String::alloc()->init(entry_name.c_str(), NS::UTF8StringEncoding));
 
   internal_data->function = NS::TransferPtr(library->newFunction(entry.get()));
+  if (!internal_data->function) {
+    LOG_ASSERT(0, "Metal library has no function '{}'", entry_name);
+    success = false;
+  }
 
   // store compute pipeline directly on the shader
-  if (type == rhi::ShaderType::Compute) {
+  if (success && type == rhi::ShaderType::Compute) {
     internal_data->compute_pipeline =
         NS::TransferPtr(device_->newComputePipelineState(internal_data->function.get(), &error));
     if (error) {

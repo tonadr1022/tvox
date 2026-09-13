@@ -4,8 +4,8 @@ namespace gfx {
 namespace {
 
 constexpr ShaderTechniqueDesc::StageDesc k_basic_stages[] = {
-    {.stage = ShaderStage::Vertex, .entry = "vs_main"},
-    {.stage = ShaderStage::Fragment, .entry = "fs_main"},
+    {.stage = rhi::ShaderType::Vertex, .entry = "vs_main"},
+    {.stage = rhi::ShaderType::Fragment, .entry = "fs_main"},
 };
 
 constexpr ShaderTechniqueDesc k_techniques[] = {

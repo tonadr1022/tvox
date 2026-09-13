@@ -30,7 +30,7 @@ class ShaderCache {
   [[nodiscard]] EnsureStats ensure_all(bool force = false);
 
   /// Load a cooked metallib by technique name + stage.
-  [[nodiscard]] bool load_metallib(std::string_view technique, ShaderStage stage,
+  [[nodiscard]] bool load_metallib(std::string_view technique, rhi::ShaderType stage,
                                    std::vector<uint8_t>& out, std::string* error = nullptr) const;
 
  private:
