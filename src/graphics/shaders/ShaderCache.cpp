@@ -5,6 +5,7 @@
 
 #include "core/FileIo.hpp"
 #include "core/Logger.hpp"
+#include "graphics/shaders/ShaderCompiler.hpp"
 #include "graphics/shaders/TechniqueRegistry.hpp"
 
 namespace gfx {
@@ -469,12 +470,10 @@ size_t ShaderCache::registered_shader_count() const {
 
 bool ShaderCache::any_registered_outdated() const {
   std::scoped_lock lock(registered_mu_);
-  for (const auto& [technique, stage] : registered_shaders_) {
-    if (is_outdated(technique, stage)) {
-      return true;
-    }
-  }
-  return false;
+  return std::ranges::any_of(registered_shaders_,
+                             [this](const std::pair<std::string, rhi::ShaderType>& pair) {
+                               return is_outdated(pair.first, pair.second);
+                             });
 }
 
 bool ShaderCache::load_shader(std::string_view technique, rhi::ShaderType stage,

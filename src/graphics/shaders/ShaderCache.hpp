@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "graphics/shaders/ShaderCompiler.hpp"
+#include "graphics/rhi/ShaderType.hpp"
 
 namespace gfx {
 
