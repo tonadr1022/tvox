@@ -11,14 +11,18 @@
 #include <cstddef>
 
 #include "graphics/rhi/CmdEncoder.hpp"
+#include "graphics/rhi/Graphics.hpp"
 #include "small_vector/small_vector.hpp"
 
 namespace gfx::metal {
+
+class MetalDevice;
 
 class MetalCmdEncoder : public rhi::CmdEncoder {
  public:
   size_t get_encoder_index() { return 0; }
 
+  void set_device(MetalDevice* device) { device_ = device; }
   void set_cmd_buffer(const NS::SharedPtr<MTL4::CommandBuffer>& cmd_buf) { cmd_buf_ = cmd_buf; }
 
   void begin_rendering(rhi::Swapchain& swapchain) override;
@@ -32,6 +36,10 @@ class MetalCmdEncoder : public rhi::CmdEncoder {
   NS::SharedPtr<MTL4::CommandBuffer> cmd_buf_;
 
   gch::small_vector<NS::SharedPtr<MTL::Drawable>, 8> presents_;
+
+ private:
+  MetalDevice* device_{};
+  rhi::RenderPassInfo renderpass_info_{};
 };
 
 }  // namespace gfx::metal

@@ -14,6 +14,19 @@
 #include "graphics/rhi/Graphics.hpp"
 
 namespace gfx::metal {
+namespace {
+
+MTL::PixelFormat to_metal_format(rhi::Format format) {
+  switch (format) {
+    case rhi::Format::BGRA8_UNORM:
+      return MTL::PixelFormatBGRA8Unorm;
+    case rhi::Format::Unknown:
+      return MTL::PixelFormatInvalid;
+  }
+  return MTL::PixelFormatInvalid;
+}
+
+}  // namespace
 
 MetalDevice::~MetalDevice() = default;
 
@@ -29,6 +42,7 @@ void MetalDevice::init() {
     frame.cmd_allocator = NS::TransferPtr(device_->newCommandAllocator());
     frame.cmd_buf = NS::TransferPtr(device_->newCommandBuffer());
     frame.cmd_encoder.emplace();
+    frame.cmd_encoder->set_device(this);
     frame.cmd_encoder->set_cmd_buffer(frame.cmd_buf);
     frame.fence = NS::TransferPtr(device_->newSharedEvent());
   }
@@ -37,6 +51,7 @@ void MetalDevice::init() {
 void MetalDevice::create_swapchain(const rhi::SwapchainDesc& desc, SDL_Window* window,
                                    rhi::Swapchain& swapchain) {
   swapchain.desc = desc;
+  swapchain.desc.format = rhi::Format::BGRA8_UNORM;
 
   if (!swapchain.internal_data) {
     swapchain.internal_data = wi::allocator::make_shared<Swapchain_Metal>();
@@ -115,11 +130,23 @@ bool MetalDevice::create_shader(rhi::ShaderType type, const void* data, size_t s
 
 bool MetalDevice::create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& pipeline) {
   pipeline.desc = desc;
-
-  // allow recreation
   pipeline.internal_data.reset();
   pipeline.internal_data = wi::allocator::make_shared<Pipeline_Metal>();
-  Pipeline_Metal* internal_data = to_internal(pipeline);
+  pipelines_cache_.clear();
+  return true;
+}
+
+MTL::RenderPipelineState* MetalDevice::ensure_render_pipeline(
+    rhi::Pipeline& pipeline, const rhi::RenderPassInfo& renderpass_info) {
+  rhi::PipelineHash hash;
+  hash.pipeline = &pipeline;
+  hash.renderpass_hash = renderpass_info.get_hash();
+
+  if (auto it = pipelines_cache_.find(hash); it != pipelines_cache_.end()) {
+    return it->second.get();
+  }
+
+  const rhi::PipelineDesc& desc = pipeline.desc;
 
   NS::SharedPtr<MTL::RenderPipelineDescriptor> render_pipeline_desc =
       NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
@@ -141,19 +168,33 @@ bool MetalDevice::create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& 
     render_pipeline_desc->setFragmentFunction(internal->function.get());
   }
 
-  // render_pipeline_desc->setShaderValidation(MTL::ShaderValidationEnabled);
-
-  NS::Error* error{};
-  internal_data->render_pipeline =
-      NS::TransferPtr(device_->newRenderPipelineState(render_pipeline_desc.get(), &error));
-  if (error) {
-    auto* desc = error->localizedDescription();
-    LERROR("{}", desc->utf8String());
-    error->release();
-    return false;
+  for (uint32_t i = 0; i < renderpass_info.rt_count; ++i) {
+    auto* attachment = render_pipeline_desc->colorAttachments()->object(i);
+    attachment->setPixelFormat(to_metal_format(renderpass_info.rt_formats[i]));
   }
 
-  return true;
+  if (renderpass_info.ds_format != rhi::Format::Unknown) {
+    const MTL::PixelFormat ds = to_metal_format(renderpass_info.ds_format);
+    render_pipeline_desc->setDepthAttachmentPixelFormat(ds);
+  }
+
+  if (renderpass_info.sample_count > 1) {
+    render_pipeline_desc->setRasterSampleCount(renderpass_info.sample_count);
+  }
+
+  NS::Error* error{};
+  NS::SharedPtr<MTL::RenderPipelineState> pso =
+      NS::TransferPtr(device_->newRenderPipelineState(render_pipeline_desc.get(), &error));
+  if (error) {
+    auto* err_desc = error->localizedDescription();
+    LERROR("{}", err_desc->utf8String());
+    error->release();
+    return nullptr;
+  }
+
+  auto [it, inserted] = pipelines_cache_.emplace(hash, std::move(pso));
+  ASSERT(inserted);
+  return it->second.get();
 }
 
 rhi::CmdEncoder* MetalDevice::begin_cmd_encoder() {

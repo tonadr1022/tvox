@@ -5,18 +5,22 @@
 #include <Foundation/NSSharedPtr.hpp>
 // clang-format on
 
+#include <optional>
 #include <string_view>
+#include <unordered_map>
 
 #include <Metal/Metal.hpp>
 
 #include "graphics/metal/MetalCmdEncoder.hpp"
 #include "graphics/rhi/CmdEncoder.hpp"
 #include "graphics/rhi/Device.hpp"
+#include "graphics/rhi/Graphics.hpp"
 #include "small_vector/small_vector.hpp"
 
 namespace MTL {
 class Device;
-}
+class RenderPipelineState;
+}  // namespace MTL
 
 namespace gfx::metal {
 
@@ -38,9 +42,22 @@ class MetalDevice : public gfx::rhi::Device {
 
   void submit_queue() override;
 
+  /// Compile (or fetch cached) MTL render pipeline for the active render-pass formats.
+  MTL::RenderPipelineState* ensure_render_pipeline(rhi::Pipeline& pipeline,
+                                                   const rhi::RenderPassInfo& renderpass_info);
+
  private:
+  struct PipelineHashHasher {
+    size_t operator()(const rhi::PipelineHash& hash) const {
+      return static_cast<size_t>(hash.get_hash());
+    }
+  };
+
   NS::SharedPtr<MTL::Device> device_;
   NS::SharedPtr<MTL4::CommandQueue> queue_;
+
+  std::unordered_map<rhi::PipelineHash, NS::SharedPtr<MTL::RenderPipelineState>, PipelineHashHasher>
+      pipelines_cache_;
 
   struct PerFrame {
     NS::SharedPtr<MTL4::CommandAllocator> cmd_allocator;

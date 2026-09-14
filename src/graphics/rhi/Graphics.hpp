@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <glm/vec4.hpp>
 
 #include "graphics/rhi/ShaderType.hpp"
@@ -10,8 +11,14 @@ struct SDL_Window;
 
 namespace gfx::rhi {
 
+enum class Format : uint8_t {
+  Unknown = 0,
+  BGRA8_UNORM,
+};
+
 struct SwapchainDesc {
   uint32_t width, height;
+  Format format{Format::BGRA8_UNORM};
 };
 
 struct Swapchain {
@@ -44,6 +51,71 @@ struct PipelineDesc {
 struct Pipeline {
   wi::allocator::shared_ptr<void> internal_data;
   PipelineDesc desc;
+};
+
+struct RenderPassInfo {
+  static constexpr uint32_t k_max_rt = 8;
+
+  Format rt_formats[k_max_rt] = {};
+  uint32_t rt_count = 0;
+  Format ds_format = Format::Unknown;
+  uint32_t sample_count = 1;
+
+  constexpr uint64_t get_hash() const {
+    union Hasher {
+      struct {
+        uint64_t rt_format_0 : 6;
+        uint64_t rt_format_1 : 6;
+        uint64_t rt_format_2 : 6;
+        uint64_t rt_format_3 : 6;
+        uint64_t rt_format_4 : 6;
+        uint64_t rt_format_5 : 6;
+        uint64_t rt_format_6 : 6;
+        uint64_t rt_format_7 : 6;
+        uint64_t ds_format : 6;
+        uint64_t sample_count : 3;
+      } bits;
+      uint64_t value;
+    } hasher = {};
+    static_assert(sizeof(Hasher) == sizeof(uint64_t));
+    hasher.bits.rt_format_0 = static_cast<uint64_t>(rt_formats[0]);
+    hasher.bits.rt_format_1 = static_cast<uint64_t>(rt_formats[1]);
+    hasher.bits.rt_format_2 = static_cast<uint64_t>(rt_formats[2]);
+    hasher.bits.rt_format_3 = static_cast<uint64_t>(rt_formats[3]);
+    hasher.bits.rt_format_4 = static_cast<uint64_t>(rt_formats[4]);
+    hasher.bits.rt_format_5 = static_cast<uint64_t>(rt_formats[5]);
+    hasher.bits.rt_format_6 = static_cast<uint64_t>(rt_formats[6]);
+    hasher.bits.rt_format_7 = static_cast<uint64_t>(rt_formats[7]);
+    hasher.bits.ds_format = static_cast<uint64_t>(ds_format);
+    hasher.bits.sample_count = static_cast<uint64_t>(sample_count);
+    return hasher.value;
+  }
+
+  static constexpr RenderPassInfo from(const SwapchainDesc& swapchain_desc) {
+    RenderPassInfo info;
+    info.rt_count = 1;
+    info.rt_formats[0] = swapchain_desc.format;
+    return info;
+  }
+};
+
+struct PipelineHash {
+  const Pipeline* pipeline = nullptr;
+  uint64_t renderpass_hash = 0;
+
+  constexpr bool operator==(const PipelineHash& other) const {
+    return pipeline == other.pipeline && renderpass_hash == other.renderpass_hash;
+  }
+
+  constexpr uint64_t get_hash() const {
+    union {
+      const Pipeline* ptr;
+      uint64_t value;
+    } pso_hasher = {};
+    static_assert(sizeof(pso_hasher) == sizeof(uint64_t));
+    pso_hasher.ptr = pipeline;
+    return (pso_hasher.value ^ (renderpass_hash << 1)) >> 1;
+  }
 };
 
 enum class LoadOp : uint8_t { Load, Clear, DontCare };

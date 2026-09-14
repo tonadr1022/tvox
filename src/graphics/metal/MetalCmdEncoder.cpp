@@ -5,6 +5,7 @@
 #include <Metal/Metal.hpp>
 #include <QuartzCore/CAMetalLayer.hpp>
 
+#include "MetalDevice.hpp"
 #include "MetalTypes.hpp"
 #include "core/EAssert.hpp"
 
@@ -41,20 +42,25 @@ void MetalCmdEncoder::begin_rendering(rhi::Swapchain& swapchain) {
   desc->colorAttachments()->setObject(color_descriptor.get(), 0);
 
   curr_render_encoder_ = NS::TransferPtr(cmd_buf_->renderCommandEncoder(desc.get())->retain());
+  renderpass_info_ = rhi::RenderPassInfo::from(swapchain.desc);
 }
 
 void MetalCmdEncoder::end_rendering() {
   ASSERT(curr_render_encoder_);
   curr_render_encoder_->endEncoding();
   curr_render_encoder_ = nullptr;
+  renderpass_info_ = {};
 }
 
 void MetalCmdEncoder::bind_pipeline(rhi::Pipeline& pipeline) {
   // TODO: flush state, barriers, etc
+  ASSERT(device_);
   ASSERT(curr_render_encoder_);
-  auto* pipeline_internal = to_internal(pipeline);
-  ASSERT(pipeline_internal->render_pipeline);
-  curr_render_encoder_->setRenderPipelineState(pipeline_internal->render_pipeline.get());
+  ASSERT(renderpass_info_.rt_count > 0);
+
+  MTL::RenderPipelineState* pso = device_->ensure_render_pipeline(pipeline, renderpass_info_);
+  ASSERT(pso);
+  curr_render_encoder_->setRenderPipelineState(pso);
 }
 
 void MetalCmdEncoder::draw(uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex,
