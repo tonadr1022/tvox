@@ -116,6 +116,11 @@ bool MetalDevice::create_shader(rhi::ShaderType type, const void* data, size_t s
 bool MetalDevice::create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& pipeline) {
   pipeline.desc = desc;
 
+  // allow recreation
+  pipeline.internal_data.reset();
+  pipeline.internal_data = wi::allocator::make_shared<Pipeline_Metal>();
+  Pipeline_Metal* internal_data = to_internal(pipeline);
+
   NS::SharedPtr<MTL::RenderPipelineDescriptor> render_pipeline_desc =
       NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
 
@@ -135,21 +140,20 @@ bool MetalDevice::create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& 
     auto* internal = to_internal(desc.fragment_shader);
     render_pipeline_desc->setFragmentFunction(internal->function.get());
   }
-  // render_pipeline_desc->setDepth
 
   // render_pipeline_desc->setShaderValidation(MTL::ShaderValidationEnabled);
 
-  bool success{true};
   NS::Error* error{};
-  device_->newRenderPipelineState(render_pipeline_desc.get(), &error);
+  internal_data->render_pipeline =
+      NS::TransferPtr(device_->newRenderPipelineState(render_pipeline_desc.get(), &error));
   if (error) {
     auto* desc = error->localizedDescription();
     LERROR("{}", desc->utf8String());
     error->release();
-    success = false;
+    return false;
   }
 
-  return success;
+  return true;
 }
 
 rhi::CmdEncoder* MetalDevice::begin_cmd_encoder() {

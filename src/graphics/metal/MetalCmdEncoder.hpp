@@ -23,6 +23,9 @@ class MetalCmdEncoder : public rhi::CmdEncoder {
 
   void begin_rendering(rhi::Swapchain& swapchain) override;
   void end_rendering() override;
+  void bind_pipeline(rhi::Pipeline& pipeline) override;
+  void draw(uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex,
+            uint32_t first_instance) override;
 
   NS::SharedPtr<MTL4::RenderCommandEncoder> curr_render_encoder_;
   NS::SharedPtr<MTL4::ComputeCommandEncoder> curr_compute_encoder_;

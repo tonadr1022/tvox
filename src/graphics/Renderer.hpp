@@ -34,7 +34,9 @@ class Renderer {
   std::optional<ShaderCache> shader_cache_;
   std::unique_ptr<gfx::rhi::Device> device_;
   gfx::rhi::Swapchain swapchain_;
+
   rhi::Shader basic_vs_;
   rhi::Shader basic_fs_;
+  rhi::Pipeline basic_;
 };
 }  // namespace gfx

@@ -7,6 +7,7 @@
 #include "graphics/rhi/CmdEncoder.hpp"
 #include "graphics/rhi/Device.hpp"
 #include "graphics/rhi/Graphics.hpp"
+#include "graphics/rhi/ShaderType.hpp"
 #include "graphics/shaders/TechniqueRegistry.hpp"
 
 namespace gfx {
@@ -65,6 +66,8 @@ void Renderer::render() {
 
   auto* enc = device_->begin_cmd_encoder();
   enc->begin_rendering(swapchain_);
+  enc->bind_pipeline(basic_);
+  enc->draw(3, 1, 0, 0);
 
   enc->end_rendering();
   device_->end_cmd_encoder(enc);
@@ -81,6 +84,9 @@ void Renderer::reload_shaders() {
 
   load_shader(basic_vs_, "basic", rhi::ShaderType::Vertex);
   load_shader(basic_fs_, "basic", rhi::ShaderType::Fragment);
+
+  device_->create_pipeline(
+      rhi::PipelineDesc{.vertex_shader = &basic_vs_, .fragment_shader = &basic_fs_}, basic_);
 }
 
 void Renderer::load_shader(rhi::Shader& shader, std::string_view technique, rhi::ShaderType stage) {

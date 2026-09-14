@@ -49,4 +49,19 @@ void MetalCmdEncoder::end_rendering() {
   curr_render_encoder_ = nullptr;
 }
 
+void MetalCmdEncoder::bind_pipeline(rhi::Pipeline& pipeline) {
+  // TODO: flush state, barriers, etc
+  ASSERT(curr_render_encoder_);
+  auto* pipeline_internal = to_internal(pipeline);
+  ASSERT(pipeline_internal->render_pipeline);
+  curr_render_encoder_->setRenderPipelineState(pipeline_internal->render_pipeline.get());
+}
+
+void MetalCmdEncoder::draw(uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex,
+                           uint32_t first_instance) {
+  ASSERT(curr_render_encoder_);
+  curr_render_encoder_->drawPrimitives(MTL::PrimitiveType::PrimitiveTypeTriangle, first_vertex,
+                                       vertex_count, instance_count, first_instance);
+}
+
 }  // namespace gfx::metal

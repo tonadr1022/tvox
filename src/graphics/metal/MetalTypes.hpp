@@ -1,13 +1,14 @@
 #pragma once
 
 // clang-format off
-#include <Metal/MTLComputePipeline.hpp>
 #include <type_traits> // IWYU pragma: keep
 #include <Foundation/NSSharedPtr.hpp>
 // clang-format on
 
+#include <Metal/MTLComputePipeline.hpp>
 #include <Metal/MTLDrawable.hpp>
 #include <Metal/MTLLibrary.hpp>
+#include <Metal/MTLRenderPipeline.hpp>
 #include <Metal/MTLTexture.hpp>
 
 namespace CA {
@@ -25,12 +26,17 @@ struct Shader_Metal {
   NS::SharedPtr<MTL::ComputePipelineState> compute_pipeline;
 };
 
+struct Pipeline_Metal {
+  NS::SharedPtr<MTL::RenderPipelineState> render_pipeline;
+};
+
 template <typename T>
 struct MetalType;
 
 namespace gfx::rhi {
 struct Swapchain;
 struct Shader;
+struct Pipeline;
 }  // namespace gfx::rhi
 
 template <>
@@ -41,6 +47,11 @@ struct MetalType<gfx::rhi::Swapchain> {
 template <>
 struct MetalType<gfx::rhi::Shader> {
   using type = Shader_Metal;
+};
+
+template <>
+struct MetalType<gfx::rhi::Pipeline> {
+  using type = Pipeline_Metal;
 };
 
 template <typename T>

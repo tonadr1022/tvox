@@ -19,7 +19,7 @@
 
 #define FATAL_IF(expr, ...)   \
   do {                        \
-    if (!(expr)) {            \
+    if ((expr)) {            \
       LCRITICAL(__VA_ARGS__); \
       std::abort();           \
     }                         \
