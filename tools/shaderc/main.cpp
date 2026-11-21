@@ -1,11 +1,11 @@
+#include <SDL3/SDL.h>
+
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <string>
 #include <string_view>
 #include <vector>
-
-#include <SDL3/SDL.h>
 
 #include "core/Paths.hpp"
 #include "graphics/shaders/ShaderCache.hpp"
