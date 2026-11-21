@@ -1,0 +1,5 @@
+- Simple compute shader
+- Cube in compute shader, with camera controls
+- shading
+- Chunk rendering: DDA
+- Multiple chunks
