@@ -21,8 +21,8 @@ struct ShaderCompileInput {
 
 // Vulkan/Spirv not supported yet
 struct ShaderCompileOutput {
-  std::vector<uint8_t> dxil;
-  std::vector<uint8_t> metallib;
+  std::vector<std::byte> dxil;
+  std::vector<std::byte> metallib;
   std::vector<std::string> dependencies;
   std::string error_message;
   std::string dxc_version;

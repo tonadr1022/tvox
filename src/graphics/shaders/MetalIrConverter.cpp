@@ -144,7 +144,7 @@ IRRootSignature* default_root_signature(MetalIrSymbols& ir, std::string& error) 
 
 }  // namespace
 
-bool convert_dxil_to_metallib(const ShaderCompileInput& input, const std::vector<uint8_t>& dxil,
+bool convert_dxil_to_metallib(const ShaderCompileInput& input, const std::vector<std::byte>& dxil,
                               const std::vector<std::filesystem::path>& library_dirs,
                               ShaderCompileOutput& out) {
   MetalIrSymbols& ir = metal_ir(library_dirs);
@@ -176,8 +176,8 @@ bool convert_dxil_to_metallib(const ShaderCompileInput& input, const std::vector
   ir.IRCompilerSetGlobalRootSignature(compiler, root_sig);
   ir.IRCompilerSetStageInGenerationMode(compiler, IRStageInCodeGenerationModeUseMetalVertexFetch);
 
-  IRObject* dxil_object =
-      ir.IRObjectCreateFromDXIL(dxil.data(), dxil.size(), IRBytecodeOwnershipNone);
+  IRObject* dxil_object = ir.IRObjectCreateFromDXIL(reinterpret_cast<const uint8_t*>(dxil.data()),
+                                                    dxil.size(), IRBytecodeOwnershipNone);
   IRError* convert_error = nullptr;
   IRObject* metal_object =
       ir.IRCompilerAllocCompileAndLink(compiler, nullptr, dxil_object, &convert_error);
@@ -197,7 +197,7 @@ bool convert_dxil_to_metallib(const ShaderCompileInput& input, const std::vector
   const size_t size = ir.IRMetalLibGetBytecodeSize(metallib);
   out.metallib.resize(size);
   if (size > 0) {
-    ir.IRMetalLibGetBytecode(metallib, out.metallib.data());
+    ir.IRMetalLibGetBytecode(metallib, reinterpret_cast<uint8_t*>(out.metallib.data()));
   }
 
   ir.IRMetalLibBinaryDestroy(metallib);

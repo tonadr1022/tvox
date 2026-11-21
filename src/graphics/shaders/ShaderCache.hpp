@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdint>
+#include <expected>
 #include <filesystem>
 #include <mutex>
 #include <set>
@@ -35,9 +35,8 @@ class ShaderCache {
   /// Ensure every stage of one technique is cooked.
   [[nodiscard]] EnsureStats ensure_technique(std::string_view name, bool force = false);
 
-  /// True if the cook unit is missing or content/tool hash is stale.
-  [[nodiscard]] bool is_outdated(std::string_view technique, rhi::ShaderType stage,
-                                 std::string* reason = nullptr) const;
+  [[nodiscard]] std::optional<std::string> is_outdated(std::string_view technique,
+                                                       rhi::ShaderType stage) const;
 
   /// True if any unit previously returned by `load_shader` is outdated
   /// (watcher poll hook; no file watcher in v1).
@@ -47,8 +46,8 @@ class ShaderCache {
 
   /// Load a cooked shader by technique name + stage.
   /// Successful loads are tracked for future hot-reload polling.
-  [[nodiscard]] bool load_shader(std::string_view technique, rhi::ShaderType stage,
-                                 std::vector<uint8_t>& out, std::string* error = nullptr);
+  [[nodiscard]] std::expected<std::vector<std::byte>, std::string> load_shader(
+      std::string_view technique, rhi::ShaderType stage);
 
  private:
   CacheRoots roots_;

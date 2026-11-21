@@ -5,11 +5,10 @@
 #include <Foundation/NSSharedPtr.hpp>
 // clang-format on
 
+#include <Metal/Metal.hpp>
 #include <optional>
 #include <string_view>
 #include <unordered_map>
-
-#include <Metal/Metal.hpp>
 
 #include "graphics/metal/MetalCmdEncoder.hpp"
 #include "graphics/rhi/CmdEncoder.hpp"

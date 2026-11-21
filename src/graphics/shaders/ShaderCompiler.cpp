@@ -120,7 +120,7 @@ DxcState& dxc_state() {
 }
 
 bool compile_dxil(const ShaderCompileInput& input, ShaderCompileOutput& out,
-                  std::vector<uint8_t>& dxil) {
+                  std::vector<std::byte>& dxil) {
   DxcState& dxc = dxc_state();
   if (!dxc.create_instance) {
     out.error_message = dxc.load_error.empty() ? "DXC is not available" : dxc.load_error;
@@ -129,7 +129,9 @@ bool compile_dxil(const ShaderCompileInput& input, ShaderCompileOutput& out,
   out.dxc_version = dxc.version;
 
   std::vector<uint8_t> source;
-  if (!core::read_bytes(input.source_path, source, out.error_message)) {
+  const auto bytes = core::read_binary_file(input.source_path);
+  if (!bytes) {
+    out.error_message = bytes.error();
     return false;
   }
 
@@ -268,8 +270,8 @@ bool compile_dxil(const ShaderCompileInput& input, ShaderCompileOutput& out,
     return false;
   }
 
-  const auto* bytes = static_cast<const uint8_t*>(shader_blob->GetBufferPointer());
-  dxil.assign(bytes, bytes + shader_blob->GetBufferSize());
+  const auto* shader_blob_ptr = static_cast<const std::byte*>(shader_blob->GetBufferPointer());
+  dxil.assign(shader_blob_ptr, shader_blob_ptr + shader_blob->GetBufferSize());
   out.error_message.clear();
   return true;
 }
@@ -308,7 +310,7 @@ bool compile(const ShaderCompileInput& input, ShaderCompileOutput& out) {
     return false;
   }
 
-  std::vector<uint8_t> dxil;
+  std::vector<std::byte> dxil;
   if (!compile_dxil(input, out, dxil)) {
     return false;
   }

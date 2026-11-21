@@ -102,14 +102,13 @@ void Renderer::load_shader(rhi::Shader& shader, std::string_view technique, rhi:
     return;
   }
 
-  std::vector<uint8_t> bytes;
-  std::string error;
-  if (!shader_cache_->load_shader(technique, stage, bytes, &error)) {
-    LERROR("failed to load metallib for {} / {}: {}", technique, stage_desc->entry, error);
+  const auto bytes = shader_cache_->load_shader(technique, stage);
+  if (!bytes) {
+    LERROR("failed to load metallib for {} / {}: {}", technique, stage_desc->entry, bytes.error());
     return;
   }
 
-  if (!device_->create_shader(stage, bytes.data(), bytes.size(), shader, stage_desc->entry)) {
+  if (!device_->create_shader(stage, bytes->data(), bytes->size(), shader, stage_desc->entry)) {
     LERROR("create_shader failed for {} / {}", technique, stage_desc->entry);
   }
 }

@@ -1,20 +1,26 @@
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
+#include <expected>
 #include <filesystem>
+#include <span>
 #include <string>
 #include <vector>
 
 namespace core {
 
-/// Returns false on error
-[[nodiscard]] bool read_bytes(const std::filesystem::path& path, std::vector<uint8_t>& out,
-                              std::string& error);
+[[nodiscard]] std::expected<std::vector<std::byte>, std::string> read_binary_file(
+    const std::filesystem::path& path);
 
-/// Create parent directories if needed
+struct WriteOptions {
+  bool make_parent_directories{true};
+};
 
-[[nodiscard]] bool write_bytes(const std::filesystem::path& path, const void* data, size_t size,
-                               std::string& error);
+[[nodiscard]] std::expected<void, std::string> write_binary_file(
+    const std::filesystem::path& path, std::span<const std::byte>,
+    const WriteOptions& write_opts = {});
+
+[[nodiscard]] std::expected<void, std::string> write_text_file(const std::filesystem::path& path,
+                                                               std::string_view text,
+                                                               const WriteOptions& write_opts = {});
 
 }  // namespace core

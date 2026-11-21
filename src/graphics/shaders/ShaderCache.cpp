@@ -1,6 +1,7 @@
 #include "graphics/shaders/ShaderCache.hpp"
 
 #include <algorithm>
+#include <expected>
 #include <nlohmann/json.hpp>
 
 #include "core/FileIo.hpp"
@@ -98,13 +99,15 @@ struct MetaFile {
   std::string metal_ir_converter_version;
 };
 
-bool load_meta(const std::filesystem::path& path, MetaFile& meta, std::string& error) {
-  std::vector<uint8_t> bytes;
-  if (!core::read_bytes(path, bytes, error)) {
-    return false;
+std::expected<MetaFile, std::string> load_meta(const std::filesystem::path& path) {
+  MetaFile meta;
+  auto bytes = core::read_binary_file(path);
+  if (!bytes) {
+    return std::unexpected{bytes.error()};
   }
+
   try {
-    const json j = json::parse(bytes.begin(), bytes.end());
+    const json j = json::parse(bytes.value().begin(), bytes.value().end());
     meta.content_hash = j.at("content_hash").get<std::string>();
     meta.entry = j.at("entry").get<std::string>();
     meta.stage = j.at("stage").get<std::string>();
@@ -114,13 +117,13 @@ bool load_meta(const std::filesystem::path& path, MetaFile& meta, std::string& e
     meta.defines = j.value("defines", std::vector<std::string>{});
     meta.dependencies = j.value("dependencies", std::vector<std::string>{});
   } catch (const json::exception& ex) {
-    error = std::string("Malformed shader meta: ") + path.string() + " (" + ex.what() + ")";
-    return false;
+    return std::unexpected{std::format("Malformed shader meta: {} {}", path.string(), ex.what())};
   }
-  return true;
+  return meta;
 }
 
-bool save_meta(const std::filesystem::path& path, const MetaFile& meta, std::string& error) {
+std::expected<void, std::string> save_meta(const std::filesystem::path& path,
+                                           const MetaFile& meta) {
   const json j = {
       {"content_hash", meta.content_hash},
       {"entry", meta.entry},
@@ -132,7 +135,7 @@ bool save_meta(const std::filesystem::path& path, const MetaFile& meta, std::str
       {"metal_ir_converter_version", meta.metal_ir_converter_version},
   };
   const std::string text = j.dump(2) + '\n';
-  return core::write_bytes(path, text.data(), text.size(), error);
+  return core::write_text_file(path, text);
 }
 
 std::vector<std::string> sorted_copy(std::vector<std::string> values) {
@@ -156,14 +159,13 @@ std::string compute_content_hash(const CacheUnit& unit,
   auto deps = sorted_copy(dependencies);
   for (const auto& dep : deps) {
     fnv1a_update(hash, dep);
-    std::vector<uint8_t> bytes;
-    std::string error;
-    if (!core::read_bytes(dep, bytes, error)) {
+    const auto bytes = core::read_binary_file(dep);
+    if (!bytes) {
       // Missing dep → unstable hash, forces rebuild next time if it reappears.
       fnv1a_update(hash, std::string_view{"<missing>"});
       continue;
     }
-    fnv1a_update(hash, bytes.data(), bytes.size());
+    fnv1a_update(hash, bytes->data(), bytes->size());
   }
   return hash_to_hex(hash);
 }
@@ -190,13 +192,12 @@ std::filesystem::path meta_path(const ShaderCache::CacheRoots& roots, const Cach
   return path;
 }
 
-bool make_unit(const ShaderCache::CacheRoots& roots, const ShaderTechniqueDesc& tech,
-               const ShaderTechniqueDesc::StageDesc& stage, CacheUnit& out, std::string* error) {
+std::expected<CacheUnit, std::string> make_unit(const ShaderCache::CacheRoots& roots,
+                                                const ShaderTechniqueDesc& tech,
+                                                const ShaderTechniqueDesc::StageDesc& stage) {
+  CacheUnit out{};
   if (roots.shader_root.empty()) {
-    if (error) {
-      *error = "ShaderCache shader_root is empty";
-    }
-    return false;
+    return std::unexpected{"Shader root empty"};
   }
   out.technique_name = tech.name;
   out.source_path = roots.shader_root / std::string(tech.path);
@@ -207,76 +208,62 @@ bool make_unit(const ShaderCache::CacheRoots& roots, const ShaderTechniqueDesc& 
   for (std::string_view define : tech.defines) {
     out.defines.emplace_back(define);
   }
-  return true;
+  return out;
 }
 
-bool make_unit(const ShaderCache::CacheRoots& roots, std::string_view technique_name,
-               rhi::ShaderType stage, CacheUnit& out, std::string* error) {
+std::expected<CacheUnit, std::string> make_unit(const ShaderCache::CacheRoots& roots,
+                                                std::string_view technique_name,
+                                                rhi::ShaderType stage) {
   const ShaderTechniqueDesc* tech = ShaderTechniqueRegistry::find(technique_name);
   if (!tech) {
-    if (error) {
-      *error = "Unknown technique: " + std::string(technique_name);
-    }
-    return false;
+    return std::unexpected{std::format("Unknown technique: {}", technique_name)};
   }
+
   for (const ShaderTechniqueDesc::StageDesc& stage_desc : tech->stages) {
     if (stage_desc.stage == stage) {
-      return make_unit(roots, *tech, stage_desc, out, error);
+      return make_unit(roots, *tech, stage_desc);
     }
   }
-  if (error) {
-    *error = "Technique '" + std::string(technique_name) + "' has no stage " + stage_name(stage);
-  }
-  return false;
+
+  return std::unexpected{
+      std::format("Technique '{}' has no stage {}", technique_name, stage_name(stage)),
+  };
 }
 
-bool unit_is_outdated(const ShaderCache::CacheRoots& roots, const CacheUnit& unit,
-                      std::string* reason) {
+std::optional<std::string> unit_is_outdated(const ShaderCache::CacheRoots& roots,
+                                            const CacheUnit& unit) {
   const auto metallib = metallib_path(roots, unit);
-  const auto meta = meta_path(roots, unit);
+  const auto meta_file = meta_path(roots, unit);
   std::error_code ec;
   if (!std::filesystem::is_regular_file(metallib, ec)) {
-    if (reason) {
-      *reason = "missing metallib";
-    }
-    return true;
-  }
-  // Packaged builds may omit meta/ → treat existing metallib as prebuilt (up to date).
-  if (!std::filesystem::is_regular_file(meta, ec)) {
-    return false;
+    return "metallib file doesn't exist: " + metallib.string();
   }
 
-  MetaFile parsed_meta;
-  std::string error;
-  if (!load_meta(meta, parsed_meta, error)) {
-    if (reason) {
-      *reason = error;
-    }
-    return true;
+  // Packaged builds may omit meta/ → treat existing metallib as prebuilt (up to date).
+  if (!std::filesystem::is_regular_file(meta_file, ec)) {
+    return "meta file doesn't exist: " + meta_file.string();
   }
+
+  auto meta_result = load_meta(meta_file);
+  if (!meta_result) {
+    return "failed to load meta: " + meta_result.error();
+  }
+  auto& parsed_meta = meta_result.value();
 
   if (parsed_meta.entry != unit.entry || parsed_meta.stage != stage_name(unit.stage) ||
       parsed_meta.profile != profile_for_stage(unit.stage) ||
       sorted_copy(parsed_meta.defines) != sorted_copy(unit.defines)) {
-    if (reason) {
-      *reason = "entry/stage/defines mismatch";
-    }
-    return true;
+    return "entrypoint/stage/profile doesn't match";
   }
 
+  // TODO: fix this api
   const ShaderToolVersions tools = query_shader_tool_versions();
   if (!tools.ok()) {
-    if (reason) {
-      *reason = tools.error_message;
-    }
-    return true;
+    return "tools version failed to load: " + tools.error_message;
   }
   if (tools.dxc != parsed_meta.dxc_version ||
       tools.metal_ir_converter != parsed_meta.metal_ir_converter_version) {
-    if (reason) {
-      *reason = "tool version mismatch";
-    }
-    return true;
+    return "dxc or metal_ir_converter version mismatch";
   }
 
   bool has_source = false;
@@ -289,32 +276,27 @@ bool unit_is_outdated(const ShaderCache::CacheRoots& roots, const CacheUnit& uni
     }
   }
   if (!has_source) {
-    if (reason) {
-      *reason = "meta missing primary source dependency";
-    }
-    return true;
+    return "meta missing source dependency";
   }
 
   const std::string hash =
       compute_content_hash(unit, parsed_meta.dependencies, tools.dxc, tools.metal_ir_converter);
   if (hash != parsed_meta.content_hash) {
-    if (reason) {
-      *reason = "content hash mismatch";
-    }
-    return true;
+    return "content hash mismatch";
   }
 
-  return false;
+  return std::nullopt;
 }
 
-bool ensure_unit(const ShaderCache::CacheRoots& roots, const CacheUnit& unit, bool force,
-                 std::string* error) {
+std::expected<void, std::string> ensure_unit(const ShaderCache::CacheRoots& roots,
+                                             const CacheUnit& unit, bool force) {
   if (!force) {
-    std::string reason;
-    if (!unit_is_outdated(roots, unit, &reason)) {
-      return true;
+    const auto outdated_reason = unit_is_outdated(roots, unit);
+    if (!outdated_reason.has_value()) {
+      return {};
     }
-    LINFO("shader outdated ({}): {} / {}", reason, unit.technique_name, unit.entry);
+    LINFO("shader outdated ({}): {} / {}", outdated_reason.value(), unit.technique_name,
+          unit.entry);
   }
 
   ShaderCompileInput input{
@@ -331,11 +313,10 @@ bool ensure_unit(const ShaderCache::CacheRoots& roots, const CacheUnit& unit, bo
 
   ShaderCompileOutput output;
   if (!compile(input, output)) {
-    if (error) {
-      *error = output.error_message;
-    }
-    return false;
+    return std::unexpected{output.error_message};
   }
+  LINFO("compiled shader {} / {} → {}", unit.technique_name, unit.entry,
+        metallib_path(roots, unit).string());
 
   std::vector<std::string> deps = output.dependencies;
   // Normalize to absolute paths for stable hashing across cwd changes.
@@ -346,6 +327,7 @@ bool ensure_unit(const ShaderCache::CacheRoots& roots, const CacheUnit& unit, bo
       dep = abs.lexically_normal().string();
     }
   }
+
   // Ensure primary source is present.
   {
     std::error_code ec;
@@ -368,21 +350,9 @@ bool ensure_unit(const ShaderCache::CacheRoots& roots, const CacheUnit& unit, bo
       .metal_ir_converter_version = output.metal_ir_converter_version,
   };
 
-  std::string write_error;
-  if (!core::write_bytes(metallib_path(roots, unit), output.metallib.data(), output.metallib.size(),
-                         write_error) ||
-      !core::write_bytes(dxil_path(roots, unit), output.dxil.data(), output.dxil.size(),
-                         write_error) ||
-      !save_meta(meta_path(roots, unit), meta, write_error)) {
-    if (error) {
-      *error = write_error;
-    }
-    return false;
-  }
-
-  LINFO("compiled shader {} / {} → {}", unit.technique_name, unit.entry,
-        metallib_path(roots, unit).string());
-  return true;
+  return core::write_binary_file(metallib_path(roots, unit), output.metallib)
+      .and_then([&] { return core::write_binary_file(dxil_path(roots, unit), output.dxil); })
+      .and_then([&] { return save_meta(meta_path(roots, unit), meta); });
 }
 
 }  // namespace
@@ -414,30 +384,33 @@ ShaderCache::EnsureStats ShaderCache::ensure_technique(std::string_view name, bo
   }
 
   for (const ShaderTechniqueDesc::StageDesc& stage : tech->stages) {
-    CacheUnit unit;
-    std::string error;
-    if (!make_unit(roots_, *tech, stage, unit, &error)) {
-      ++stats.failed;
+    auto unit = make_unit(roots_, *tech, stage);
+    if (!unit) {
+      stats.failed++;
+      LERROR("{}", unit.error());
+
+      // TODO: maybe don't do this?
       if (stats.first_error.empty()) {
-        stats.first_error = error;
+        stats.first_error = unit.error();
       }
-      LERROR("{}", error);
+
       continue;
     }
 
-    std::string reason;
-    const bool outdated = force || unit_is_outdated(roots_, unit, &reason);
+    const bool outdated = force || unit_is_outdated(roots_, unit.value());
     if (!outdated) {
       ++stats.up_to_date;
       continue;
     }
 
-    if (!ensure_unit(roots_, unit, /*force=*/true, &error)) {
+    const auto unit_ensured = ensure_unit(roots_, unit.value(), true);
+    if (!unit_ensured) {
       ++stats.failed;
       if (stats.first_error.empty()) {
-        stats.first_error = error;
+        stats.first_error = unit_ensured.error();
       }
-      LERROR("Failed to compile {} / {}: {}", unit.technique_name, unit.entry, error);
+      LERROR("Failed to compile {} / {}: {}", unit->technique_name, unit->entry,
+             unit_ensured.error());
       continue;
     }
     ++stats.compiled;
@@ -445,17 +418,14 @@ ShaderCache::EnsureStats ShaderCache::ensure_technique(std::string_view name, bo
   return stats;
 }
 
-bool ShaderCache::is_outdated(std::string_view technique, rhi::ShaderType stage,
-                              std::string* reason) const {
-  CacheUnit unit;
-  std::string error;
-  if (!make_unit(roots_, technique, stage, unit, &error)) {
-    if (reason) {
-      *reason = error;
-    }
-    return true;
+std::optional<std::string> ShaderCache::is_outdated(std::string_view technique,
+                                                    rhi::ShaderType stage) const {
+  // TODO: an error here might mean a real error?
+  const auto unit = make_unit(roots_, technique, stage);
+  if (!unit) {
+    return unit.error();
   }
-  return unit_is_outdated(roots_, unit, reason);
+  return unit_is_outdated(roots_, unit.value());
 }
 
 void ShaderCache::register_loaded(std::string_view technique, rhi::ShaderType stage) {
@@ -472,23 +442,24 @@ bool ShaderCache::any_registered_outdated() const {
   std::scoped_lock lock(registered_mu_);
   return std::ranges::any_of(registered_shaders_,
                              [this](const std::pair<std::string, rhi::ShaderType>& pair) {
-                               return is_outdated(pair.first, pair.second);
+                               return is_outdated(pair.first, pair.second).has_value();
                              });
 }
 
-bool ShaderCache::load_shader(std::string_view technique, rhi::ShaderType stage,
-                              std::vector<uint8_t>& out, std::string* error) {
-  CacheUnit unit;
-  std::string local_error;
-  std::string& err = error ? *error : local_error;
-  if (!make_unit(roots_, technique, stage, unit, &err)) {
-    return false;
+std::expected<std::vector<std::byte>, std::string> ShaderCache::load_shader(
+    std::string_view technique, rhi::ShaderType stage) {
+  const auto unit = make_unit(roots_, technique, stage);
+  if (!unit) {
+    return std::unexpected{unit.error()};
   }
-  if (!core::read_bytes(metallib_path(roots_, unit), out, err)) {
-    return false;
+  const auto bytes = core::read_binary_file(metallib_path(roots_, unit.value()));
+  if (!bytes.has_value()) {
+    return std::unexpected{bytes.error()};
   }
+
   register_loaded(technique, stage);
-  return true;
+
+  return bytes.value();
 }
 
 }  // namespace gfx
