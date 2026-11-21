@@ -24,3 +24,9 @@
       std::abort();                                                                                \
     }                                                                                              \
   } while (0)
+
+#define FATAL(expr, ...)                                                                           \
+  do {                                                                                             \
+    LCRITICAL(__VA_ARGS__);                                                                        \
+    std::abort();                                                                                  \
+  } while (0)

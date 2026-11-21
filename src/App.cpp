@@ -32,13 +32,14 @@ App::App() : window_(create_window()) {
 }
 
 void App::run() {
-  while (true) {
+  bool shutdown_requested{};
+  while (!shutdown_requested) {
     SDL_Event event{};
     while (SDL_PollEvent(&event)) {
       switch (event.type) {
       case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
       case SDL_EVENT_QUIT: {
-        break;
+        shutdown_requested = true;
         continue;
       }
       default:

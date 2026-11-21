@@ -1,10 +1,14 @@
-#include "shader_shared.hlsli"
+
+typealias vec2 = float2;
+typealias vec3 = float3;
+typealias vec4 = float4;
 
 struct VOut {
-  float4 position : SV_Position;
+  vec4 position : SV_Position;
 };
 
-VOut vs_main(uint vert_idx : SV_VertexID) {
+[shader("vertex")]
+VOut vs_main(uint vert_idx: SV_VertexID) {
   VOut output;
   if (vert_idx == 0) {
     output.position = float4(-0.5, -0.5, 0, 1);
@@ -16,6 +20,7 @@ VOut vs_main(uint vert_idx : SV_VertexID) {
   return output;
 }
 
+[shader("fragment")]
 float4 fs_main(VOut input) : SV_Target0 {
   return float4(1, 1, 1, 1);
 }

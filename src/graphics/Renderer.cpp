@@ -82,8 +82,8 @@ void Renderer::reload_shaders() {
     LERROR("shader ensure_all failed: {}", stats.first_error);
   }
 
-  load_shader(basic_vs_, "basic", rhi::ShaderType::Vertex);
-  load_shader(basic_fs_, "basic", rhi::ShaderType::Fragment);
+  load_shader(basic_vs_, "basic_tri", rhi::ShaderType::Vertex);
+  load_shader(basic_fs_, "basic_tri", rhi::ShaderType::Fragment);
 
   device_->create_pipeline(
       rhi::PipelineDesc{.vertex_shader = &basic_vs_, .fragment_shader = &basic_fs_}, basic_);

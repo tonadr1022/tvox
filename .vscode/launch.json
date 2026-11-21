@@ -1,0 +1,53 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug (CMake)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Debug/src/tvox",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "preLaunchTask": "CMake: build (Debug)"
+        },
+        {
+            "name": "Release (CMake)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Release/src/tvox",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "preLaunchTask": "CMake: build (Release)"
+        },
+        {
+            "name": "Debug ASan/UBSan",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/DebugASan/src/tvox",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "ASAN_OPTIONS",
+                    "value": "detect_leaks=1:halt_on_error=1"
+                },
+                {
+                    "name": "UBSAN_OPTIONS",
+                    "value": "print_stacktrace=1:halt_on_error=1"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "preLaunchTask": "CMake: build (DebugASan)"
+        }
+    ]
+}

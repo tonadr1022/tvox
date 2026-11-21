@@ -1,7 +1,9 @@
 ---
 BasedOnStyle: LLVM
-Language: Cpp
 ColumnLimit: 100
 IndentWidth: 2
 PointerAlignment: Left
 AlwaysBreakTemplateDeclarations: Yes
+BreakAfterAttributes: Always
+AllowShortFunctionsOnASingleLine: None
+AllowShortBlocksOnASingleLine: Never

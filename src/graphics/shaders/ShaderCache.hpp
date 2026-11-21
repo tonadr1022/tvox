@@ -1,6 +1,7 @@
 #pragma once
 
 #include "graphics/rhi/ShaderType.hpp"
+#include "graphics/shaders/ShaderCompiler.hpp"
 
 #include <expected>
 #include <filesystem>
@@ -12,6 +13,17 @@
 #include <vector>
 
 namespace gfx {
+
+// TODO: not publicly available
+
+/// One compiled stage of a technique (cook unit).
+struct CacheUnit {
+  std::string_view technique_name;
+  std::filesystem::path source_path;
+  rhi::ShaderType stage{rhi::ShaderType::Vertex};
+  std::string entry;
+  std::vector<std::string> defines;
+};
 
 class ShaderCache {
 public:
@@ -30,29 +42,38 @@ public:
   };
 
   /// Ensure every stage in `TechniqueRegistry` is cooked.
-  [[nodiscard]] EnsureStats ensure_all(bool force = false);
+  [[nodiscard]]
+  EnsureStats ensure_all(bool force = false);
 
   /// Ensure every stage of one technique is cooked.
-  [[nodiscard]] EnsureStats ensure_technique(std::string_view name, bool force = false);
+  [[nodiscard]]
+  EnsureStats ensure_technique(std::string_view name, bool force = false);
 
-  [[nodiscard]] std::optional<std::string> is_outdated(std::string_view technique,
-                                                       rhi::ShaderType stage) const;
+  [[nodiscard]]
+  std::optional<std::string> is_outdated(std::string_view technique, rhi::ShaderType stage) const;
 
   /// True if any unit previously returned by `load_shader` is outdated
   /// (watcher poll hook; no file watcher in v1).
-  [[nodiscard]] bool any_registered_outdated() const;
+  [[nodiscard]]
+  bool any_registered_outdated() const;
 
-  [[nodiscard]] size_t registered_shader_count() const;
+  [[nodiscard]]
+  size_t registered_shader_count() const;
 
   /// Load a cooked shader by technique name + stage.
   /// Successful loads are tracked for future hot-reload polling.
-  [[nodiscard]] std::expected<std::vector<std::byte>, std::string>
-  load_shader(std::string_view technique, rhi::ShaderType stage);
+  [[nodiscard]]
+  std::expected<std::vector<std::byte>, std::string> load_shader(std::string_view technique,
+                                                                 rhi::ShaderType stage);
 
 private:
+  ShaderCompiler shader_compiler_;
   CacheRoots roots_;
   mutable std::mutex registered_mu_;
   std::set<std::pair<std::string, rhi::ShaderType>> registered_shaders_;
+
+  std::expected<void, std::string> ensure_unit(const ShaderCache::CacheRoots& roots,
+                                               const CacheUnit& unit, bool force);
 
   void register_loaded(std::string_view technique, rhi::ShaderType stage);
 };

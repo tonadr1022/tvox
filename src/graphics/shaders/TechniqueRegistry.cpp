@@ -10,15 +10,17 @@ constexpr ShaderTechniqueDesc::StageDesc k_basic_stages[] = {
 
 constexpr ShaderTechniqueDesc k_techniques[] = {
     {
-        .name = "basic",
-        .path = "passes/basic.hlsl",
+        .name = "basic_tri",
+        .path = "passes/basic_tri",
         .stages = k_basic_stages,
     },
 };
 
 } // namespace
 
-std::span<const ShaderTechniqueDesc> ShaderTechniqueRegistry::all() { return k_techniques; }
+std::span<const ShaderTechniqueDesc> ShaderTechniqueRegistry::all() {
+  return k_techniques;
+}
 
 const ShaderTechniqueDesc* ShaderTechniqueRegistry::find(std::string_view name) {
   for (const ShaderTechniqueDesc& tech : k_techniques) {

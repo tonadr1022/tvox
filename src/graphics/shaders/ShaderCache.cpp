@@ -79,15 +79,6 @@ const char* profile_for_stage(rhi::ShaderType stage) {
   return "vs_6_6";
 }
 
-/// One compiled stage of a technique (cook unit).
-struct CacheUnit {
-  std::string_view technique_name;
-  std::filesystem::path source_path;
-  rhi::ShaderType stage{rhi::ShaderType::Vertex};
-  std::string entry;
-  std::vector<std::string> defines;
-};
-
 struct MetaFile {
   std::string content_hash;
   std::string entry;
@@ -95,8 +86,7 @@ struct MetaFile {
   std::string profile;
   std::vector<std::string> defines;
   std::vector<std::string> dependencies;
-  std::string dxc_version;
-  std::string metal_ir_converter_version;
+  std::string slang_version;
 };
 
 std::expected<MetaFile, std::string> load_meta(const std::filesystem::path& path) {
@@ -112,8 +102,7 @@ std::expected<MetaFile, std::string> load_meta(const std::filesystem::path& path
     meta.entry = j.at("entry").get<std::string>();
     meta.stage = j.at("stage").get<std::string>();
     meta.profile = j.at("profile").get<std::string>();
-    meta.dxc_version = j.at("dxc_version").get<std::string>();
-    meta.metal_ir_converter_version = j.at("metal_ir_converter_version").get<std::string>();
+    meta.slang_version = j.at("slang_version").get<std::string>();
     meta.defines = j.value("defines", std::vector<std::string>{});
     meta.dependencies = j.value("dependencies", std::vector<std::string>{});
   } catch (const json::exception& ex) {
@@ -131,8 +120,7 @@ std::expected<void, std::string> save_meta(const std::filesystem::path& path,
       {"profile", meta.profile},
       {"defines", meta.defines},
       {"dependencies", meta.dependencies},
-      {"dxc_version", meta.dxc_version},
-      {"metal_ir_converter_version", meta.metal_ir_converter_version},
+      {"slang_version", meta.slang_version},
   };
   const std::string text = j.dump(2) + '\n';
   return core::write_text_file(path, text);
@@ -145,7 +133,7 @@ std::vector<std::string> sorted_copy(std::vector<std::string> values) {
 
 std::string compute_content_hash(const CacheUnit& unit,
                                  const std::vector<std::string>& dependencies,
-                                 std::string_view dxc_version, std::string_view metal_ir_version) {
+                                 std::string_view slang_version) {
   uint64_t hash = k_fnv_offset;
   fnv1a_update(hash, profile_for_stage(unit.stage));
   fnv1a_update(hash, unit.entry);
@@ -153,8 +141,7 @@ std::string compute_content_hash(const CacheUnit& unit,
   for (const auto& define : sorted_copy(unit.defines)) {
     fnv1a_update(hash, define);
   }
-  fnv1a_update(hash, dxc_version);
-  fnv1a_update(hash, metal_ir_version);
+  fnv1a_update(hash, slang_version);
 
   auto deps = sorted_copy(dependencies);
   for (const auto& dep : deps) {
@@ -261,9 +248,9 @@ std::optional<std::string> unit_is_outdated(const ShaderCache::CacheRoots& roots
   if (!tools.ok()) {
     return "tools version failed to load: " + tools.error_message;
   }
-  if (tools.dxc != parsed_meta.dxc_version ||
-      tools.metal_ir_converter != parsed_meta.metal_ir_converter_version) {
-    return "dxc or metal_ir_converter version mismatch";
+  if (tools.slang_version != parsed_meta.slang_version) {
+    return std::format("slang version mismatch: current: {}, meta: {}", tools.slang_version,
+                       parsed_meta.slang_version);
   }
 
   bool has_source = false;
@@ -280,7 +267,7 @@ std::optional<std::string> unit_is_outdated(const ShaderCache::CacheRoots& roots
   }
 
   const std::string hash =
-      compute_content_hash(unit, parsed_meta.dependencies, tools.dxc, tools.metal_ir_converter);
+      compute_content_hash(unit, parsed_meta.dependencies, tools.slang_version);
   if (hash != parsed_meta.content_hash) {
     return "content hash mismatch";
   }
@@ -288,8 +275,10 @@ std::optional<std::string> unit_is_outdated(const ShaderCache::CacheRoots& roots
   return std::nullopt;
 }
 
-std::expected<void, std::string> ensure_unit(const ShaderCache::CacheRoots& roots,
-                                             const CacheUnit& unit, bool force) {
+} // namespace
+
+std::expected<void, std::string> ShaderCache::ensure_unit(const ShaderCache::CacheRoots& roots,
+                                                          const CacheUnit& unit, bool force) {
   if (!force) {
     const auto outdated_reason = unit_is_outdated(roots, unit);
     if (!outdated_reason.has_value()) {
@@ -311,20 +300,20 @@ std::expected<void, std::string> ensure_unit(const ShaderCache::CacheRoots& root
       .defines = unit.defines,
   };
 
-  ShaderCompileOutput output;
-  if (!compile(input, output)) {
-    return std::unexpected{output.error_message};
+  const auto shader_compile_output = shader_compiler_.compile(input);
+  if (!shader_compile_output) {
+    return std::unexpected{shader_compile_output.error()};
   }
   LINFO("compiled shader {} / {} → {}", unit.technique_name, unit.entry,
         metallib_path(roots, unit).string());
 
-  std::vector<std::string> deps = output.dependencies;
+  std::vector<std::string> dependency_paths = shader_compile_output->dependency_paths;
   // Normalize to absolute paths for stable hashing across cwd changes.
-  for (auto& dep : deps) {
+  for (auto& dependency_path : dependency_paths) {
     std::error_code ec;
-    auto abs = std::filesystem::absolute(dep, ec);
+    auto abs_path = std::filesystem::absolute(dependency_path, ec);
     if (!ec) {
-      dep = abs.lexically_normal().string();
+      dependency_path = abs_path.lexically_normal().string();
     }
   }
 
@@ -333,31 +322,33 @@ std::expected<void, std::string> ensure_unit(const ShaderCache::CacheRoots& root
     std::error_code ec;
     const std::string source =
         std::filesystem::absolute(unit.source_path, ec).lexically_normal().string();
-    if (std::ranges::find(deps, source) == deps.end()) {
-      deps.push_back(source);
+    if (std::ranges::find(dependency_paths, source) == dependency_paths.end()) {
+      dependency_paths.push_back(source);
     }
   }
 
   MetaFile meta{
       .content_hash =
-          compute_content_hash(unit, deps, output.dxc_version, output.metal_ir_converter_version),
+          compute_content_hash(unit, dependency_paths, shader_compile_output->slang_version),
       .entry = unit.entry,
       .stage = stage_name(unit.stage),
       .profile = profile_for_stage(unit.stage),
       .defines = unit.defines,
-      .dependencies = deps,
-      .dxc_version = output.dxc_version,
-      .metal_ir_converter_version = output.metal_ir_converter_version,
+      .dependencies = dependency_paths,
+      .slang_version = shader_compile_output->slang_version,
   };
 
-  return core::write_binary_file(metallib_path(roots, unit), output.metallib)
-      .and_then([&] { return core::write_binary_file(dxil_path(roots, unit), output.dxil); })
+  return core::write_binary_file(metallib_path(roots, unit), shader_compile_output->bytes)
+      .and_then([&] {
+        return core::write_binary_file(dxil_path(roots, unit), shader_compile_output->bytes);
+      })
       .and_then([&] { return save_meta(meta_path(roots, unit), meta); });
 }
 
-} // namespace
-
-ShaderCache::ShaderCache(ShaderCache::CacheRoots roots) : roots_(std::move(roots)) {}
+ShaderCache::ShaderCache(ShaderCache::CacheRoots roots) : roots_(std::move(roots)) {
+  // TODO: explicit init shader cache? or raii everything?
+  shader_compiler_.init();
+}
 
 ShaderCache::EnsureStats ShaderCache::ensure_all(bool force) {
   EnsureStats stats;
@@ -403,7 +394,7 @@ ShaderCache::EnsureStats ShaderCache::ensure_technique(std::string_view name, bo
       continue;
     }
 
-    const auto unit_ensured = ensure_unit(roots_, unit.value(), true);
+    const auto unit_ensured = ensure_unit(roots_, unit.value(), false);
     if (!unit_ensured) {
       ++stats.failed;
       if (stats.first_error.empty()) {

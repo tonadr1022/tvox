@@ -2,13 +2,16 @@
 
 #include "graphics/rhi/ShaderType.hpp"
 
+#include <slang-com-ptr.h>
+#include <slang.h>
+
+#include <expected>
 #include <filesystem>
 #include <string>
 #include <vector>
 
 namespace gfx {
 
-// Vulkan/Spirv not supported yet
 struct ShaderCompileInput {
   std::filesystem::path source_path;
   rhi::ShaderType stage{rhi::ShaderType::Vertex};
@@ -19,35 +22,42 @@ struct ShaderCompileInput {
   bool embed_debug{false};
 };
 
-// Vulkan/Spirv not supported yet
 struct ShaderCompileOutput {
-  std::vector<std::byte> dxil;
-  std::vector<std::byte> metallib;
-  std::vector<std::string> dependencies;
-  std::string error_message;
-  std::string dxc_version;
-  std::string metal_ir_converter_version;
+  std::vector<std::byte> bytes;
+  std::vector<std::string> dependency_paths;
+  std::string slang_version;
 
-  [[nodiscard]] bool ok() const { return error_message.empty() && !metallib.empty(); }
+  [[nodiscard]]
+  bool ok() const {
+    return !bytes.empty();
+  }
 };
-
-/// Extra directories searched (in order) before the executable dir and the
-/// CMake-provided `third_party/shader_libs/bin` path.
-void set_library_search_paths(std::vector<std::filesystem::path> paths);
 
 struct ShaderToolVersions {
-  std::string dxc;
-  std::string metal_ir_converter;
+  std::string slang_version;
   std::string error_message;
 
-  [[nodiscard]] bool ok() const { return error_message.empty(); }
+  bool ok() const {
+    return error_message.empty() && !slang_version.empty();
+  }
 };
 
-/// Load DXC + Metal IR Converter (if needed) and return version strings for cache keys.
-[[nodiscard]] ShaderToolVersions query_shader_tool_versions();
+class ShaderCompiler {
+public:
+  void init() {
+  }
+  std::expected<ShaderCompileOutput, std::string> compile(const ShaderCompileInput& compile_input);
 
-/// In-process HLSL → DXIL (DXC) → metallib (Metal Shader Converter).
-/// On failure, returns false and fills `out.error_message`.
-[[nodiscard]] bool compile(const ShaderCompileInput& input, ShaderCompileOutput& out);
+private:
+  void init_if_needed();
+  Slang::ComPtr<slang::IGlobalSession> global_session_;
+  Slang::ComPtr<slang::ISession> session_;
+
+  bool initialized_global_session_{};
+};
+
+// TODO: move into class. move everything here into the class.
+[[nodiscard]]
+ShaderToolVersions query_shader_tool_versions();
 
 } // namespace gfx

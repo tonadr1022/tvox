@@ -5,20 +5,16 @@ add_library(tvox_shader_compiler STATIC
   core/DynamicLib.cpp
   core/FileIo.cpp
   graphics/shaders/ShaderCompiler.cpp
-  graphics/shaders/MetalIrConverter.cpp
   graphics/shaders/TechniqueRegistry.cpp
   graphics/shaders/ShaderCache.cpp
 )
 target_include_directories(tvox_shader_compiler PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}
 )
-target_link_libraries(tvox_shader_compiler PRIVATE
-  tvox_shader_libs
+target_link_libraries(tvox_shader_compiler PUBLIC
+  slang
   SDL3::SDL3
   nlohmann_json::nlohmann_json
-)
-target_compile_definitions(tvox_shader_compiler PRIVATE
-  TVOX_SHADER_LIBS_BIN="${TVOX_SHADER_LIBS_BIN}"
 )
 
 add_executable(${target_name}
@@ -42,6 +38,7 @@ if (${BUILD_METAL})
 endif()
 
 target_link_libraries(${target_name} PRIVATE
+  slang
   METAL_CPP
   SDL3::SDL3
   glm::glm
@@ -52,5 +49,3 @@ target_include_directories(${target_name} PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_SOURCE_DIR}/third_party/vendored
 )
-
-tvox_copy_shader_libs(${target_name})
