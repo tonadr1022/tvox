@@ -37,7 +37,7 @@ namespace gfx::rhi {
 struct Swapchain;
 struct Shader;
 struct Pipeline;
-}  // namespace gfx::rhi
+} // namespace gfx::rhi
 
 template <>
 struct MetalType<gfx::rhi::Swapchain> {

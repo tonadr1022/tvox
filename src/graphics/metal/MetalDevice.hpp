@@ -5,26 +5,26 @@
 #include <Foundation/NSSharedPtr.hpp>
 // clang-format on
 
-#include <Metal/Metal.hpp>
-#include <optional>
-#include <string_view>
-#include <unordered_map>
-
 #include "graphics/metal/MetalCmdEncoder.hpp"
 #include "graphics/rhi/CmdEncoder.hpp"
 #include "graphics/rhi/Device.hpp"
 #include "graphics/rhi/Graphics.hpp"
 #include "small_vector/small_vector.hpp"
 
+#include <Metal/Metal.hpp>
+#include <optional>
+#include <string_view>
+#include <unordered_map>
+
 namespace MTL {
 class Device;
 class RenderPipelineState;
-}  // namespace MTL
+} // namespace MTL
 
 namespace gfx::metal {
 
 class MetalDevice : public gfx::rhi::Device {
- public:
+public:
   ~MetalDevice() override;
 
   void init() override;
@@ -45,7 +45,7 @@ class MetalDevice : public gfx::rhi::Device {
   MTL::RenderPipelineState* ensure_render_pipeline(rhi::Pipeline& pipeline,
                                                    const rhi::RenderPassInfo& renderpass_info);
 
- private:
+private:
   struct PipelineHashHasher {
     size_t operator()(const rhi::PipelineHash& hash) const {
       return static_cast<size_t>(hash.get_hash());
@@ -76,4 +76,4 @@ class MetalDevice : public gfx::rhi::Device {
   size_t frame_num_{};
 };
 
-}  // namespace gfx::metal
+} // namespace gfx::metal

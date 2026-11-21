@@ -1,29 +1,28 @@
 #include "graphics/shaders/MetalIrConverter.hpp"
 
-#include <metal_irconverter/metal_irconverter.h>
+#include "core/DynamicLib.hpp"
 
+#include <metal_irconverter/metal_irconverter.h>
 #include <mutex>
 #include <string>
-
-#include "core/DynamicLib.hpp"
 
 namespace gfx {
 namespace {
 
 IRShaderStage ir_stage_for(rhi::ShaderType stage) {
   switch (stage) {
-    case rhi::ShaderType::Vertex:
-      return IRShaderStageVertex;
-    case rhi::ShaderType::Fragment:
-      return IRShaderStageFragment;
-    case rhi::ShaderType::Compute:
-      return IRShaderStageCompute;
-    case rhi::ShaderType::Mesh:
-      return IRShaderStageMesh;
-    case rhi::ShaderType::Task:
-      return IRShaderStageAmplification;
-    case rhi::ShaderType::None:
-      break;
+  case rhi::ShaderType::Vertex:
+    return IRShaderStageVertex;
+  case rhi::ShaderType::Fragment:
+    return IRShaderStageFragment;
+  case rhi::ShaderType::Compute:
+    return IRShaderStageCompute;
+  case rhi::ShaderType::Mesh:
+    return IRShaderStageMesh;
+  case rhi::ShaderType::Task:
+    return IRShaderStageAmplification;
+  case rhi::ShaderType::None:
+    break;
   }
   return IRShaderStageVertex;
 }
@@ -58,18 +57,17 @@ struct MetalIrSymbols {
   bool load(const std::vector<std::filesystem::path>& dirs) {
     const std::string filename = core::shared_library_filename("metalirconverter");
     if (!lib.open_search(filename, dirs, load_error)) {
-      load_error +=
-          "Place libmetalirconverter next to the executable or in "
-          "third_party/shader_libs/bin/.";
+      load_error += "Place libmetalirconverter next to the executable or in "
+                    "third_party/shader_libs/bin/.";
       return false;
     }
 
-#define TVOX_IR_LOAD(name)                                  \
-  do {                                                      \
-    (name) = lib.symbol<decltype(name)>(#name, load_error); \
-    if (!(name)) {                                          \
-      return false;                                         \
-    }                                                       \
+#define TVOX_IR_LOAD(name)                                                                         \
+  do {                                                                                             \
+    (name) = lib.symbol<decltype(name)>(#name, load_error);                                        \
+    if (!(name)) {                                                                                 \
+      return false;                                                                                \
+    }                                                                                              \
   } while (0)
     TVOX_IR_LOAD(IRCompilerCreate);
     TVOX_IR_LOAD(IRCompilerDestroy);
@@ -142,7 +140,7 @@ IRRootSignature* default_root_signature(MetalIrSymbols& ir, std::string& error) 
   return root_sig;
 }
 
-}  // namespace
+} // namespace
 
 bool convert_dxil_to_metallib(const ShaderCompileInput& input, const std::vector<std::byte>& dxil,
                               const std::vector<std::filesystem::path>& library_dirs,
@@ -224,4 +222,4 @@ bool query_metal_ir_version(const std::vector<std::filesystem::path>& library_di
   return true;
 }
 
-}  // namespace gfx
+} // namespace gfx

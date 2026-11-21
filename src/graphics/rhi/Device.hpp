@@ -1,9 +1,9 @@
 #pragma once
 
+#include "graphics/rhi/Graphics.hpp"
+
 #include <memory>
 #include <string_view>
-
-#include "graphics/rhi/Graphics.hpp"
 
 struct SDL_Window;
 
@@ -16,7 +16,7 @@ struct SwapchainDesc;
 constexpr int k_max_frames_in_flight = 3;
 
 class Device {
- public:
+public:
   virtual ~Device();
 
   virtual void init() = 0;
@@ -34,7 +34,7 @@ class Device {
   virtual void end_cmd_encoder(rhi::CmdEncoder* encoder) = 0;
 };
 
-}  // namespace gfx::rhi
+} // namespace gfx::rhi
 
 namespace gfx {
 

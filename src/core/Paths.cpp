@@ -46,4 +46,4 @@ std::filesystem::path resolve_project_root() {
   return {};
 }
 
-}  // namespace core
+} // namespace core

@@ -1,11 +1,11 @@
 #pragma once
 
-#include <cstdint>
-#include <glm/vec4.hpp>
-
 #include "graphics/rhi/ShaderType.hpp"
 #include "small_vector/small_vector.hpp"
 #include "wicked_engine/wiAllocator.h"
+
+#include <cstdint>
+#include <glm/vec4.hpp>
 
 struct SDL_Window;
 
@@ -298,4 +298,4 @@ struct GraphicsPipelineCreateInfo {
   std::string name;
 };
 
-}  // namespace gfx::rhi
+} // namespace gfx::rhi

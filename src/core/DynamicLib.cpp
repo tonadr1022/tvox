@@ -1,7 +1,6 @@
 #include "core/DynamicLib.hpp"
 
 #include <dlfcn.h>
-
 #include <sstream>
 
 namespace core {
@@ -93,4 +92,4 @@ void* DynamicLib::symbol_raw(const char* name, std::string& error) const {
   return sym;
 }
 
-}  // namespace core
+} // namespace core

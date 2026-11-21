@@ -1,6 +1,6 @@
 #include "Device.hpp"
 
-#include "core/Logger.hpp"  // IWYU pragma: keep
+#include "core/Logger.hpp" // IWYU pragma: keep
 
 #ifdef __APPLE__
 #include "graphics/metal/MetalDevice.hpp"
@@ -23,4 +23,4 @@ std::unique_ptr<rhi::Device> make_device() {
 #endif
 }
 
-}  // namespace gfx
+} // namespace gfx

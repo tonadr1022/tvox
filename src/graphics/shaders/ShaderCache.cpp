@@ -1,13 +1,13 @@
 #include "graphics/shaders/ShaderCache.hpp"
 
-#include <algorithm>
-#include <expected>
-#include <nlohmann/json.hpp>
-
 #include "core/FileIo.hpp"
 #include "core/Logger.hpp"
 #include "graphics/shaders/ShaderCompiler.hpp"
 #include "graphics/shaders/TechniqueRegistry.hpp"
+
+#include <algorithm>
+#include <expected>
+#include <nlohmann/json.hpp>
 
 namespace gfx {
 namespace {
@@ -44,18 +44,18 @@ std::string hash_to_hex(uint64_t hash) {
 
 const char* stage_name(rhi::ShaderType stage) {
   switch (stage) {
-    case rhi::ShaderType::Vertex:
-      return "vertex";
-    case rhi::ShaderType::Fragment:
-      return "fragment";
-    case rhi::ShaderType::Compute:
-      return "compute";
-    case rhi::ShaderType::Mesh:
-      return "mesh";
-    case rhi::ShaderType::Task:
-      return "task";
-    case rhi::ShaderType::None:
-      break;
+  case rhi::ShaderType::Vertex:
+    return "vertex";
+  case rhi::ShaderType::Fragment:
+    return "fragment";
+  case rhi::ShaderType::Compute:
+    return "compute";
+  case rhi::ShaderType::Mesh:
+    return "mesh";
+  case rhi::ShaderType::Task:
+    return "task";
+  case rhi::ShaderType::None:
+    break;
   }
   return "none";
 }
@@ -63,18 +63,18 @@ const char* stage_name(rhi::ShaderType stage) {
 // TODO: use newer profile if possible
 const char* profile_for_stage(rhi::ShaderType stage) {
   switch (stage) {
-    case rhi::ShaderType::Vertex:
-      return "vs_6_6";
-    case rhi::ShaderType::Fragment:
-      return "ps_6_6";
-    case rhi::ShaderType::Compute:
-      return "cs_6_6";
-    case rhi::ShaderType::Mesh:
-      return "ms_6_6";
-    case rhi::ShaderType::Task:
-      return "as_6_6";
-    case rhi::ShaderType::None:
-      break;
+  case rhi::ShaderType::Vertex:
+    return "vs_6_6";
+  case rhi::ShaderType::Fragment:
+    return "ps_6_6";
+  case rhi::ShaderType::Compute:
+    return "cs_6_6";
+  case rhi::ShaderType::Mesh:
+    return "ms_6_6";
+  case rhi::ShaderType::Task:
+    return "as_6_6";
+  case rhi::ShaderType::None:
+    break;
   }
   return "vs_6_6";
 }
@@ -355,7 +355,7 @@ std::expected<void, std::string> ensure_unit(const ShaderCache::CacheRoots& root
       .and_then([&] { return save_meta(meta_path(roots, unit), meta); });
 }
 
-}  // namespace
+} // namespace
 
 ShaderCache::ShaderCache(ShaderCache::CacheRoots roots) : roots_(std::move(roots)) {}
 
@@ -446,8 +446,8 @@ bool ShaderCache::any_registered_outdated() const {
                              });
 }
 
-std::expected<std::vector<std::byte>, std::string> ShaderCache::load_shader(
-    std::string_view technique, rhi::ShaderType stage) {
+std::expected<std::vector<std::byte>, std::string>
+ShaderCache::load_shader(std::string_view technique, rhi::ShaderType stage) {
   const auto unit = make_unit(roots_, technique, stage);
   if (!unit) {
     return std::unexpected{unit.error()};
@@ -462,4 +462,4 @@ std::expected<std::vector<std::byte>, std::string> ShaderCache::load_shader(
   return bytes.value();
 }
 
-}  // namespace gfx
+} // namespace gfx

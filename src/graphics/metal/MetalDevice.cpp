@@ -1,9 +1,5 @@
 #include "MetalDevice.hpp"
 
-#include <Foundation/NSSharedPtr.hpp>
-#include <QuartzCore/CAMetalLayer.hpp>
-#include <string>
-
 #include "core/Assert.hpp"
 #include "core/Logger.hpp"
 #include "core/Util.hpp"
@@ -13,20 +9,24 @@
 #include "graphics/rhi/Device.hpp"
 #include "graphics/rhi/Graphics.hpp"
 
+#include <Foundation/NSSharedPtr.hpp>
+#include <QuartzCore/CAMetalLayer.hpp>
+#include <string>
+
 namespace gfx::metal {
 namespace {
 
 MTL::PixelFormat to_metal_format(rhi::Format format) {
   switch (format) {
-    case rhi::Format::BGRA8_UNORM:
-      return MTL::PixelFormatBGRA8Unorm;
-    case rhi::Format::Unknown:
-      return MTL::PixelFormatInvalid;
+  case rhi::Format::BGRA8_UNORM:
+    return MTL::PixelFormatBGRA8Unorm;
+  case rhi::Format::Unknown:
+    return MTL::PixelFormatInvalid;
   }
   return MTL::PixelFormatInvalid;
 }
 
-}  // namespace
+} // namespace
 
 MetalDevice::~MetalDevice() = default;
 
@@ -136,8 +136,9 @@ bool MetalDevice::create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& 
   return true;
 }
 
-MTL::RenderPipelineState* MetalDevice::ensure_render_pipeline(
-    rhi::Pipeline& pipeline, const rhi::RenderPassInfo& renderpass_info) {
+MTL::RenderPipelineState*
+MetalDevice::ensure_render_pipeline(rhi::Pipeline& pipeline,
+                                    const rhi::RenderPassInfo& renderpass_info) {
   rhi::PipelineHash hash;
   hash.pipeline = &pipeline;
   hash.renderpass_hash = renderpass_info.get_hash();
@@ -242,4 +243,4 @@ void MetalDevice::submit_queue() {
   frame.fence->waitUntilSignaledValue(frame.fence_value, UINT64_MAX);
 }
 
-}  // namespace gfx::metal
+} // namespace gfx::metal

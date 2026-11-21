@@ -4,12 +4,12 @@
 #include "platform/Window.hpp"
 
 class App {
- public:
+public:
   App();
   void run();
   void shutdown();
 
- private:
+private:
   Window window_;
   gfx::Renderer renderer_;
 };

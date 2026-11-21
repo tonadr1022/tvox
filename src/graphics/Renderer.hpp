@@ -1,12 +1,12 @@
 #pragma once
 
+#include "graphics/rhi/Graphics.hpp"
+#include "graphics/shaders/ShaderCache.hpp"
+
 #include <filesystem>
 #include <memory>
 #include <optional>
 #include <string_view>
-
-#include "graphics/rhi/Graphics.hpp"
-#include "graphics/shaders/ShaderCache.hpp"
 
 namespace gfx {
 namespace rhi {
@@ -14,7 +14,7 @@ class Device;
 }
 
 class Renderer {
- public:
+public:
   Renderer();
   ~Renderer();
   struct InitInfo {
@@ -25,7 +25,7 @@ class Renderer {
   void init(const InitInfo& info);
   void render();
 
- private:
+private:
   void reload_shaders();
   /// Load a cooked metallib by logical technique id + stage (entry from registry).
   void load_shader(rhi::Shader& shader, std::string_view technique, rhi::ShaderType stage);
@@ -39,4 +39,4 @@ class Renderer {
   rhi::Shader basic_fs_;
   rhi::Pipeline basic_;
 };
-}  // namespace gfx
+} // namespace gfx

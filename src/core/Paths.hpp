@@ -15,4 +15,4 @@ namespace core {
 /// Project root: directory containing `resources/shaders`. Searches cwd then executable dir.
 [[nodiscard]] std::filesystem::path resolve_project_root();
 
-}  // namespace core
+} // namespace core

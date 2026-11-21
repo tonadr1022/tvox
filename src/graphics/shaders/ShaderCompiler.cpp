@@ -1,14 +1,14 @@
 #include "graphics/shaders/ShaderCompiler.hpp"
 
-#include <clocale>
-#include <cstring>
-#include <mutex>
-#include <string_view>
-
 #include "core/DynamicLib.hpp"
 #include "core/FileIo.hpp"
 #include "core/Paths.hpp"
 #include "graphics/shaders/MetalIrConverter.hpp"
+
+#include <clocale>
+#include <cstring>
+#include <mutex>
+#include <string_view>
 
 #define ComPtr CComPtr
 #include <dxcapi.h>
@@ -59,18 +59,18 @@ std::vector<std::filesystem::path> library_search_paths() {
 
 const char* profile_for_stage(rhi::ShaderType stage) {
   switch (stage) {
-    case rhi::ShaderType::Vertex:
-      return "vs_6_6";
-    case rhi::ShaderType::Fragment:
-      return "ps_6_6";
-    case rhi::ShaderType::Compute:
-      return "cs_6_6";
-    case rhi::ShaderType::Mesh:
-      return "ms_6_6";
-    case rhi::ShaderType::Task:
-      return "as_6_6";
-    case rhi::ShaderType::None:
-      break;
+  case rhi::ShaderType::Vertex:
+    return "vs_6_6";
+  case rhi::ShaderType::Fragment:
+    return "ps_6_6";
+  case rhi::ShaderType::Compute:
+    return "cs_6_6";
+  case rhi::ShaderType::Mesh:
+    return "ms_6_6";
+  case rhi::ShaderType::Task:
+    return "as_6_6";
+  case rhi::ShaderType::None:
+    break;
   }
   return "vs_6_6";
 }
@@ -276,7 +276,7 @@ bool compile_dxil(const ShaderCompileInput& input, ShaderCompileOutput& out,
   return true;
 }
 
-}  // namespace
+} // namespace
 
 void set_library_search_paths(std::vector<std::filesystem::path> paths) {
   std::scoped_lock lock(g_search_paths_mu);
@@ -319,4 +319,4 @@ bool compile(const ShaderCompileInput& input, ShaderCompileOutput& out) {
   return convert_dxil_to_metallib(input, dxil, library_search_paths(), out);
 }
 
-}  // namespace gfx
+} // namespace gfx

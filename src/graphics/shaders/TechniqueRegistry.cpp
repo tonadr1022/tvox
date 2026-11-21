@@ -16,7 +16,7 @@ constexpr ShaderTechniqueDesc k_techniques[] = {
     },
 };
 
-}  // namespace
+} // namespace
 
 std::span<const ShaderTechniqueDesc> ShaderTechniqueRegistry::all() { return k_techniques; }
 
@@ -29,4 +29,4 @@ const ShaderTechniqueDesc* ShaderTechniqueRegistry::find(std::string_view name) 
   return nullptr;
 }
 
-}  // namespace gfx
+} // namespace gfx

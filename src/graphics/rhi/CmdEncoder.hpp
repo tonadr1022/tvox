@@ -4,7 +4,7 @@
 
 namespace gfx::rhi {
 class CmdEncoder {
- public:
+public:
   virtual ~CmdEncoder() = default;
   virtual void begin_rendering(rhi::Swapchain& swapchain) = 0;
   virtual void end_rendering() = 0;
@@ -12,6 +12,6 @@ class CmdEncoder {
   virtual void draw(uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex,
                     uint32_t first_instance) = 0;
 
- private:
+private:
 };
-}  // namespace gfx::rhi
+} // namespace gfx::rhi

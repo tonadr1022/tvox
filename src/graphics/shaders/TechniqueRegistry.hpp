@@ -1,9 +1,9 @@
 #pragma once
 
+#include "graphics/rhi/ShaderType.hpp"
+
 #include <span>
 #include <string_view>
-
-#include "graphics/rhi/ShaderType.hpp"
 
 namespace gfx {
 
@@ -22,9 +22,9 @@ struct ShaderTechniqueDesc {
 };
 
 class ShaderTechniqueRegistry {
- public:
+public:
   [[nodiscard]] static std::span<const ShaderTechniqueDesc> all();
   [[nodiscard]] static const ShaderTechniqueDesc* find(std::string_view name);
 };
 
-}  // namespace gfx
+} // namespace gfx

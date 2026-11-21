@@ -5,21 +5,21 @@
 #include <Foundation/NSSharedPtr.hpp>
 // clang-format on
 
+#include "graphics/rhi/CmdEncoder.hpp"
+#include "graphics/rhi/Graphics.hpp"
+#include "small_vector/small_vector.hpp"
+
 #include <Metal/MTL4ComputeCommandEncoder.hpp>
 #include <Metal/MTL4RenderCommandEncoder.hpp>
 #include <Metal/MTLDrawable.hpp>
 #include <cstddef>
-
-#include "graphics/rhi/CmdEncoder.hpp"
-#include "graphics/rhi/Graphics.hpp"
-#include "small_vector/small_vector.hpp"
 
 namespace gfx::metal {
 
 class MetalDevice;
 
 class MetalCmdEncoder : public rhi::CmdEncoder {
- public:
+public:
   size_t get_encoder_index() { return 0; }
 
   void set_device(MetalDevice* device) { device_ = device; }
@@ -37,9 +37,9 @@ class MetalCmdEncoder : public rhi::CmdEncoder {
 
   gch::small_vector<NS::SharedPtr<MTL::Drawable>, 8> presents_;
 
- private:
+private:
   MetalDevice* device_{};
   rhi::RenderPassInfo renderpass_info_{};
 };
 
-}  // namespace gfx::metal
+} // namespace gfx::metal

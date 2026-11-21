@@ -1,10 +1,10 @@
 #pragma once
 
+#include "graphics/rhi/ShaderType.hpp"
+
 #include <filesystem>
 #include <string>
 #include <vector>
-
-#include "graphics/rhi/ShaderType.hpp"
 
 namespace gfx {
 
@@ -50,4 +50,4 @@ struct ShaderToolVersions {
 /// On failure, returns false and fills `out.error_message`.
 [[nodiscard]] bool compile(const ShaderCompileInput& input, ShaderCompileOutput& out);
 
-}  // namespace gfx
+} // namespace gfx

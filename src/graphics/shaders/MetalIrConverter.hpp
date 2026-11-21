@@ -1,9 +1,9 @@
 #pragma once
 
+#include "graphics/shaders/ShaderCompiler.hpp"
+
 #include <filesystem>
 #include <vector>
-
-#include "graphics/shaders/ShaderCompiler.hpp"
 
 namespace gfx {
 
@@ -17,4 +17,4 @@ namespace gfx {
 [[nodiscard]] bool query_metal_ir_version(const std::vector<std::filesystem::path>& library_dirs,
                                           std::string& version, std::string& error);
 
-}  // namespace gfx
+} // namespace gfx

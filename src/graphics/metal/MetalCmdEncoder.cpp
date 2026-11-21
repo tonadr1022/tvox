@@ -1,13 +1,13 @@
 #include "MetalCmdEncoder.hpp"
 
+#include "MetalDevice.hpp"
+#include "MetalTypes.hpp"
+#include "core/Assert.hpp"
+
 #include <Foundation/NSAutoreleasePool.hpp>
 #include <Metal/MTL4RenderPass.hpp>
 #include <Metal/Metal.hpp>
 #include <QuartzCore/CAMetalLayer.hpp>
-
-#include "MetalDevice.hpp"
-#include "MetalTypes.hpp"
-#include "core/Assert.hpp"
 
 namespace gfx::metal {
 
@@ -70,4 +70,4 @@ void MetalCmdEncoder::draw(uint32_t vertex_count, uint32_t instance_count, uint3
                                        vertex_count, instance_count, first_instance);
 }
 
-}  // namespace gfx::metal
+} // namespace gfx::metal

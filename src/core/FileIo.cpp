@@ -6,8 +6,8 @@
 
 namespace core {
 
-std::expected<std::vector<std::byte>, std::string> read_binary_file(
-    const std::filesystem::path& path) {
+std::expected<std::vector<std::byte>, std::string>
+read_binary_file(const std::filesystem::path& path) {
   std::vector<std::byte> out;
   std::ifstream file(path, std::ios::binary);
   if (!file) {
@@ -57,4 +57,4 @@ std::expected<void, std::string> write_text_file(const std::filesystem::path& pa
       write_opts);
 }
 
-}  // namespace core
+} // namespace core

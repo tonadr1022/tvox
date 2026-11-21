@@ -44,4 +44,4 @@ private:
   void* handle_{nullptr};
 };
 
-}  // namespace core
+} // namespace core

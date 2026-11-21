@@ -1,5 +1,7 @@
 #pragma once
 
+#include "graphics/rhi/ShaderType.hpp"
+
 #include <expected>
 #include <filesystem>
 #include <mutex>
@@ -9,12 +11,10 @@
 #include <utility>
 #include <vector>
 
-#include "graphics/rhi/ShaderType.hpp"
-
 namespace gfx {
 
 class ShaderCache {
- public:
+public:
   struct CacheRoots {
     std::filesystem::path shader_root;
     std::filesystem::path cache_root;
@@ -46,10 +46,10 @@ class ShaderCache {
 
   /// Load a cooked shader by technique name + stage.
   /// Successful loads are tracked for future hot-reload polling.
-  [[nodiscard]] std::expected<std::vector<std::byte>, std::string> load_shader(
-      std::string_view technique, rhi::ShaderType stage);
+  [[nodiscard]] std::expected<std::vector<std::byte>, std::string>
+  load_shader(std::string_view technique, rhi::ShaderType stage);
 
- private:
+private:
   CacheRoots roots_;
   mutable std::mutex registered_mu_;
   std::set<std::pair<std::string, rhi::ShaderType>> registered_shaders_;
@@ -57,4 +57,4 @@ class ShaderCache {
   void register_loaded(std::string_view technique, rhi::ShaderType stage);
 };
 
-}  // namespace gfx
+} // namespace gfx

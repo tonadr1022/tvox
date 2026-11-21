@@ -1,11 +1,11 @@
 #include "App.hpp"
 
-#include <SDL3/SDL.h>
-
 #include "core/Logger.hpp"
 #include "core/Paths.hpp"
 #include "graphics/Renderer.hpp"
 #include "platform/Window.hpp"
+
+#include <SDL3/SDL.h>
 
 App::App() : window_(create_window()) {
   if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -36,13 +36,13 @@ void App::run() {
     SDL_Event event{};
     while (SDL_PollEvent(&event)) {
       switch (event.type) {
-        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-        case SDL_EVENT_QUIT: {
-          break;
-          continue;
-        }
-        default:
-          continue;
+      case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+      case SDL_EVENT_QUIT: {
+        break;
+        continue;
+      }
+      default:
+        continue;
       }
     }
 

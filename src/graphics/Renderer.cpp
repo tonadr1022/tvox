@@ -1,14 +1,14 @@
 #include "Renderer.hpp"
 
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_video.h>
-
 #include "core/Logger.hpp"
 #include "graphics/rhi/CmdEncoder.hpp"
 #include "graphics/rhi/Device.hpp"
 #include "graphics/rhi/Graphics.hpp"
 #include "graphics/rhi/ShaderType.hpp"
 #include "graphics/shaders/TechniqueRegistry.hpp"
+
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_video.h>
 
 namespace gfx {
 namespace {
@@ -23,7 +23,7 @@ const ShaderTechniqueDesc::StageDesc* find_stage(const ShaderTechniqueDesc& tech
   return nullptr;
 }
 
-}  // namespace
+} // namespace
 
 Renderer::Renderer() = default;
 Renderer::~Renderer() = default;
@@ -113,4 +113,4 @@ void Renderer::load_shader(rhi::Shader& shader, std::string_view technique, rhi:
   }
 }
 
-}  // namespace gfx
+} // namespace gfx
