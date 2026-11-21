@@ -4,7 +4,7 @@
 #include <QuartzCore/CAMetalLayer.hpp>
 #include <string>
 
-#include "core/EAssert.hpp"
+#include "core/Assert.hpp"
 #include "core/Logger.hpp"
 #include "core/Util.hpp"
 #include "graphics/metal/MetalTypes.hpp"

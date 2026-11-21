@@ -2,7 +2,7 @@
 
 #include <print>  // IWYU pragma: keep
 
-#include "core/EAssert.hpp"
+#include "core/Assert.hpp"
 
 #define LINFO(...) std::println("[info]" __VA_ARGS__)
 #define LWARN(...) std::println("[warn]     " __VA_ARGS__)
@@ -19,7 +19,7 @@
 
 #define FATAL_IF(expr, ...)   \
   do {                        \
-    if ((expr)) {            \
+    if ((expr)) {             \
       LCRITICAL(__VA_ARGS__); \
       std::abort();           \
     }                         \

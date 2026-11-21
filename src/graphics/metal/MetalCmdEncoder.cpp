@@ -7,7 +7,7 @@
 
 #include "MetalDevice.hpp"
 #include "MetalTypes.hpp"
-#include "core/EAssert.hpp"
+#include "core/Assert.hpp"
 
 namespace gfx::metal {
 
