@@ -1,5 +1,6 @@
 #include "Renderer.hpp"
 
+#include "basic_shared.h"
 #include "core/Logger.hpp"
 #include "graphics/rhi/CmdEncoder.hpp"
 #include "graphics/rhi/Device.hpp"
@@ -43,8 +44,8 @@ void Renderer::init(const InitInfo& info) {
     int w{}, h{};
     SDL_GetWindowSize(window_, &w, &h);
     device_->create_swapchain(
-        rhi::SwapchainDesc{.width = static_cast<uint32_t>(w), .height = static_cast<uint32_t>(h)},
-        window_, swapchain_);
+        {.width = static_cast<uint32_t>(w), .height = static_cast<uint32_t>(h)}, window_,
+        swapchain_);
   }
 
   FATAL_IF(info.shader_root.empty(), "shader_root is empty");
@@ -56,10 +57,17 @@ void Renderer::init(const InitInfo& info) {
 
   reload_shaders();
 
-  device_->create_gpu_heap({.size = 1024ull * 1024, .memory_type = rhi::MemoryType::CpuVisible},
+  device_->create_gpu_heap({.size = 1024ull * 1024 * rhi::k_max_frames_in_flight,
+                            .memory_type = rhi::MemoryType::CpuVisible},
                            heap);
   device_->create_gpu_heap({.size = 1024ull * 1024, .memory_type = rhi::MemoryType::GpuOnly},
                            gpu_heap);
+  cpu_vis_heap_bump_allocator_.emplace(heap.range);
+  for (size_t i = 0; i < rhi::k_max_frames_in_flight; i++) {
+    frame_allocators_[i].emplace(rhi::gpu_range(heap.range, 1024ull * 1024 * i));
+  }
+  gpu_heap_bump_allocator_.emplace(gpu_heap.range);
+  test_gpu_data_allocation_ = gpu_heap_bump_allocator_->allocate<float>(32);
 }
 
 void Renderer::render() {
@@ -69,37 +77,31 @@ void Renderer::render() {
     SDL_GetWindowSize(window_, &w, &h);
     if (w != swapchain_.desc.width || h != swapchain_.desc.height) {
       device_->create_swapchain(
-          rhi::SwapchainDesc{.width = static_cast<uint32_t>(w), .height = static_cast<uint32_t>(h)},
-          window_, swapchain_);
+          {.width = static_cast<uint32_t>(w), .height = static_cast<uint32_t>(h)}, window_,
+          swapchain_);
     }
   }
 
+  size_t frame_in_flight = frame_num_ % frames_in_flight_;
+  auto& frame_allocator = frame_allocators_[frame_in_flight];
+  frame_allocator->reset();
+
   auto* enc = device_->begin_cmd_encoder();
 
-  auto time = SDL_GetTicksNS();
-  auto elapsed = time - last_time;
-  float elapsed_seconds = (float)elapsed / 1000 / 1000 / 1000;
-  last_time = time;
-  static float curr = 0;
-  curr += elapsed_seconds * 10.f;
-
   enc->bind_pipeline(basic_comp_pso_);
-  // TODO: allocate gpu mem
-  struct RootData {
-    float* output_result;
-    float color_x;
-    float padding0;
-  } root{.output_result = (float*)gpu_heap.range.gpu, .color_x = std::sin(curr), .padding0 = 0};
-  ASSERT(heap.range.size > sizeof(RootData));
-  memcpy(heap.range.cpu + (sizeof(RootData) * frame_num_ % frames_in_flight_), &root,
-         sizeof(RootData));
 
-  enc->dispatch(heap.range.gpu + (sizeof(RootData) * frame_num_ % frames_in_flight_), 1, 1, 1);
+  auto root_data_range = frame_allocator->allocate<BasicRoot>(1);
+  *root_data_range.cpu = BasicRoot{
+      .output_result = test_gpu_data_allocation_.gpu,
+      .color_x = std::sin(SDL_GetTicksNS() / 1000.f / 1000.f / 1000.f * 10),
+  };
+
+  enc->dispatch(root_data_range.gpu, 1, 1, 1);
   enc->barrier();
 
   enc->begin_rendering(swapchain_);
   enc->bind_pipeline(basic_);
-  enc->draw(heap.range.gpu + (sizeof(RootData) * frame_num_ % frames_in_flight_), 3, 1, 0, 0);
+  enc->draw(root_data_range.gpu, 3, 1, 0, 0);
 
   enc->end_rendering();
 
@@ -121,8 +123,7 @@ void Renderer::reload_shaders() {
   load_shader(basic_fs_, "basic_tri", rhi::ShaderType::Fragment);
   load_shader(basic_cs_, "basic", rhi::ShaderType::Compute);
 
-  device_->create_pipeline(
-      rhi::PipelineDesc{.vertex_shader = &basic_vs_, .fragment_shader = &basic_fs_}, basic_);
+  device_->create_pipeline({.vertex_shader = &basic_vs_, .fragment_shader = &basic_fs_}, basic_);
   device_->create_pipeline(basic_cs_, basic_comp_pso_);
 }
 

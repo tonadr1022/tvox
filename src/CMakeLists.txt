@@ -48,4 +48,5 @@ target_link_libraries(${target_name} PRIVATE
 target_include_directories(${target_name} PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_SOURCE_DIR}/third_party/vendored
+  ${CMAKE_SOURCE_DIR}/resources/shaders/passes
 )

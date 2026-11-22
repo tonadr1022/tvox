@@ -2,6 +2,7 @@
 
 #include "graphics/rhi/Graphics.hpp"
 #include "graphics/shaders/ShaderCache.hpp"
+#include "graphics/util/BumpAllocator.hpp"
 
 #include <filesystem>
 #include <memory>
@@ -42,5 +43,10 @@ private:
   rhi::Pipeline basic_comp_pso_;
   size_t frame_num_{};
   size_t frames_in_flight_{2};
+
+  std::optional<BumpAllocator> cpu_vis_heap_bump_allocator_;
+  std::optional<BumpAllocator> frame_allocators_[2];
+  std::optional<BumpAllocator> gpu_heap_bump_allocator_;
+  rhi::GpuCpuRange<float> test_gpu_data_allocation_;
 };
 } // namespace gfx

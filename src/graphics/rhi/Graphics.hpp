@@ -68,6 +68,16 @@ struct GpuCpuRange {
   size_t size{};
 };
 
+template <typename T>
+GpuRange gpu_range(const GpuCpuRange<T> range) {
+  return {.gpu = range.gpu, .size = range.size};
+}
+
+template <typename T>
+GpuCpuRange<T> gpu_range(const GpuCpuRange<T> range, size_t offset) {
+  return {.cpu = range.cpu + offset, .gpu = range.gpu + offset, .size = range.size};
+}
+
 enum class MemoryType : uint8_t {
   CpuVisible,
   GpuOnly,
