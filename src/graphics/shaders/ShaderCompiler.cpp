@@ -46,7 +46,8 @@ SlangStage convert_slang_stage(rhi::ShaderType type) {
 ShaderToolVersions query_shader_tool_versions() {
   ShaderToolVersions versions;
 
-  versions.slang_version = "v1";
+  // Bump this when shader compiler options change so cached metallibs are rebuilt.
+  versions.slang_version = "v2-metal-debug-info";
   versions.error_message = "";
 
   return versions;
@@ -66,10 +67,28 @@ void ShaderCompiler::init_if_needed() {
   target_desc.format = SLANG_METAL_LIB;
 
   const char* search_paths[] = {"/Users/tony/personal/tvox/resources/shaders/passes"};
-  SessionDesc session_desc{.targets = &target_desc,
-                           .targetCount = 1,
-                           .searchPaths = search_paths,
-                           .searchPathCount = ARRAY_SIZE(search_paths)};
+  const CompilerOptionEntry compiler_options[] = {
+      CompilerOptionEntry{
+          .name = CompilerOptionName::DebugInformation,
+          .value = {.kind = CompilerOptionValueKind::Int,
+                    .intValue0 = SLANG_DEBUG_INFO_LEVEL_MINIMAL},
+      },
+      CompilerOptionEntry{
+          .name = CompilerOptionName::DownstreamArgs,
+          .value = {.kind = CompilerOptionValueKind::String,
+                    .stringValue0 = "metal",
+                    .stringValue1 = "-frecord-sources\n-gline-tables-only"},
+      },
+  };
+
+  SessionDesc session_desc{
+      .targets = &target_desc,
+      .targetCount = 1,
+      .searchPaths = search_paths,
+      .searchPathCount = ARRAY_SIZE(search_paths),
+      .compilerOptionEntries = compiler_options,
+      .compilerOptionEntryCount = ARRAY_SIZE(compiler_options),
+  };
   global_session_->createSession(session_desc, session_.writeRef());
   LINFO("initialized shader compiler in {} ms", sw.elapsed_milliseconds());
 }
@@ -133,7 +152,7 @@ ShaderCompiler::compile(const ShaderCompileInput& compile_input) {
   return ShaderCompileOutput{
       .bytes = bytes,
       .dependency_paths = dependency_paths,
-      .slang_version = "v1",
+      .slang_version = "v2-metal-debug-info",
   };
 }
 
