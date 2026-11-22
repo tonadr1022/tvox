@@ -1,13 +1,13 @@
-typealias vec2 = float2;
-typealias vec3 = float3;
-typealias vec4 = float4;
 
-// StructuredBuffer<float> buffer0;
-// StructuredBuffer<float> buffer1;
-// RWStructuredBuffer<float> result;
+#include "basic_shared.h"
+
+[[vk::binding(0)]]
+ConstantBuffer<BasicRoot> g_root : register(b0);
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void main(uint3 dispatch_thread_id: SV_DispatchThreadID) {
-  uint index = dispatch_thread_id.x;
+void comp_main(uint3 dispatch_thread_id: SV_DispatchThreadID) {
+  if (dispatch_thread_id.x == 0 && dispatch_thread_id.y == 0 && dispatch_thread_id.z == 0) {
+    g_root.output_result[0] = g_root.color_x;
+  }
 }

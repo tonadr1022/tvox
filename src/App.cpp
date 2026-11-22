@@ -12,10 +12,8 @@ App::App() : window_(create_window()) {
     LINFO("failed to initialize SDL: {}", SDL_GetError());
     std::exit(1);
   }
-  SDL_SetHint(SDL_HINT_FORCE_RAISEWINDOW, "1");
 
   window_.init();
-  SDL_PumpEvents();
 
   const std::filesystem::path project_root = core::resolve_project_root();
   FATAL_IF(project_root.empty(),

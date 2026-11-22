@@ -1,6 +1,7 @@
 #pragma once
 
 // clang-format off
+#include <Metal/MTLResidencySet.hpp>
 #include <type_traits> // IWYU pragma: keep
 #include <Foundation/NSSharedPtr.hpp>
 // clang-format on
@@ -31,19 +32,24 @@ public:
 
   void create_swapchain(const rhi::SwapchainDesc& desc, SDL_Window* window,
                         rhi::Swapchain& swapchain) override;
-  void create_pipeline(rhi::GraphicsPipelineCreateInfo& cinfo) override;
   bool create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& pipeline) override;
+  bool create_pipeline(const rhi::Shader& compute_shader, rhi::Pipeline& pipeline) override;
+  bool create_gpu_heap(const rhi::GpuHeapDesc& desc, rhi::GpuHeap& heap) override;
   bool create_shader(rhi::ShaderType type, const void* data, size_t size, rhi::Shader& shader,
                      std::string_view entry_point) override;
 
   rhi::CmdEncoder* begin_cmd_encoder() override;
   void end_cmd_encoder(rhi::CmdEncoder* encoder) override;
 
+  MTL::Device* get_device() const {
+    return device_.get();
+  }
+
   void submit_queue() override;
 
-  /// Compile (or fetch cached) MTL render pipeline for the active render-pass formats.
-  MTL::RenderPipelineState* ensure_render_pipeline(rhi::Pipeline& pipeline,
-                                                   const rhi::RenderPassInfo& renderpass_info);
+  MTL::RenderPipelineState*
+  get_or_create_render_pipeline(rhi::Pipeline& pipeline,
+                                const rhi::RenderPassInfo& renderpass_info);
 
 private:
   struct PipelineHashHasher {
@@ -51,6 +57,7 @@ private:
       return static_cast<size_t>(hash.get_hash());
     }
   };
+  void make_resident(MTL::Allocation* buf);
 
   NS::SharedPtr<MTL::Device> device_;
   NS::SharedPtr<MTL4::CommandQueue> queue_;
@@ -67,10 +74,17 @@ private:
     size_t fence_value{};
   };
 
-  [[nodiscard]] size_t curr_frame_in_flight() const { return frame_num_ % frames_in_flight_; }
-  PerFrame& curr_frame() { return per_frame_[curr_frame_in_flight()]; }
+  [[nodiscard]]
+  size_t curr_frame_in_flight() const {
+    return frame_num_ % frames_in_flight_;
+  }
+  PerFrame& curr_frame() {
+    return per_frame_[curr_frame_in_flight()];
+  }
 
   gch::small_vector<PerFrame, rhi::k_max_frames_in_flight> per_frame_;
+
+  NS::SharedPtr<MTL::ResidencySet> main_residency_set_;
 
   size_t frames_in_flight_{3};
   size_t frame_num_{};

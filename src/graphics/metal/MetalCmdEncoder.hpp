@@ -20,24 +20,33 @@ class MetalDevice;
 
 class MetalCmdEncoder : public rhi::CmdEncoder {
 public:
-  size_t get_encoder_index() { return 0; }
+  size_t get_encoder_index() {
+    return 0;
+  }
 
-  void set_device(MetalDevice* device) { device_ = device; }
-  void set_cmd_buffer(const NS::SharedPtr<MTL4::CommandBuffer>& cmd_buf) { cmd_buf_ = cmd_buf; }
+  void init(MetalDevice* device, const NS::SharedPtr<MTL4::CommandBuffer>& cmd_buf);
 
   void begin_rendering(rhi::Swapchain& swapchain) override;
   void end_rendering() override;
   void bind_pipeline(rhi::Pipeline& pipeline) override;
-  void draw(uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex,
+
+  void draw(const void* root, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex,
             uint32_t first_instance) override;
+  void dispatch(const void* root, uint32_t thread_groups_x, uint32_t thread_groups_y,
+                uint32_t thread_groups_z) override;
+  void barrier() override;
 
   NS::SharedPtr<MTL4::RenderCommandEncoder> curr_render_encoder_;
   NS::SharedPtr<MTL4::ComputeCommandEncoder> curr_compute_encoder_;
   NS::SharedPtr<MTL4::CommandBuffer> cmd_buf_;
+  NS::SharedPtr<MTL4::ArgumentTable> arg_table_;
 
   gch::small_vector<NS::SharedPtr<MTL::Drawable>, 8> presents_;
 
 private:
+  void set_root(const void* root) const;
+  void end_compute();
+
   MetalDevice* device_{};
   rhi::RenderPassInfo renderpass_info_{};
 };

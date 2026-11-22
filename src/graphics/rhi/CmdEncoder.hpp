@@ -9,9 +9,12 @@ public:
   virtual void begin_rendering(rhi::Swapchain& swapchain) = 0;
   virtual void end_rendering() = 0;
   virtual void bind_pipeline(rhi::Pipeline& pipeline) = 0;
-  virtual void draw(uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex,
-                    uint32_t first_instance) = 0;
 
-private:
+  virtual void draw(const void* root, uint32_t vertex_count, uint32_t instance_count,
+                    uint32_t first_vertex, uint32_t first_instance) = 0;
+  virtual void dispatch(const void* root, uint32_t thread_groups_x, uint32_t thread_groups_y,
+                        uint32_t thread_groups_z) = 0;
+
+  virtual void barrier() = 0;
 };
 } // namespace gfx::rhi

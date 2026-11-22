@@ -5,13 +5,35 @@
 #include "core/Assert.hpp"
 
 #include <Foundation/NSAutoreleasePool.hpp>
+#include <Foundation/NSSharedPtr.hpp>
+#include <Foundation/NSString.hpp>
+#include <Metal/MTL4ArgumentTable.hpp>
+#include <Metal/MTL4CommandEncoder.hpp>
 #include <Metal/MTL4RenderPass.hpp>
+#include <Metal/MTLCommandEncoder.hpp>
+#include <Metal/MTLRenderCommandEncoder.hpp>
+#include <Metal/MTLTypes.hpp>
 #include <Metal/Metal.hpp>
 #include <QuartzCore/CAMetalLayer.hpp>
 
 namespace gfx::metal {
 
+void MetalCmdEncoder::init(MetalDevice* device, const NS::SharedPtr<MTL4::CommandBuffer>& cmd_buf) {
+  device_ = device;
+  cmd_buf_ = cmd_buf;
+
+  auto arg_table_desc = NS::TransferPtr(MTL4::ArgumentTableDescriptor::alloc()->init());
+  arg_table_desc->setInitializeBindings(true);
+  arg_table_desc->setLabel(NS::String::string("arg_table", NS::UTF8StringEncoding));
+  arg_table_desc->setMaxBufferBindCount(1);
+  NS::Error* error{};
+  arg_table_ =
+      NS::TransferPtr(device_->get_device()->newArgumentTable(arg_table_desc.get(), &error));
+  ASSERT(!error);
+}
+
 void MetalCmdEncoder::begin_rendering(rhi::Swapchain& swapchain) {
+  end_compute();
   auto autorelease_pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto* internal_data = to_internal(swapchain);
 
@@ -42,6 +64,9 @@ void MetalCmdEncoder::begin_rendering(rhi::Swapchain& swapchain) {
   desc->colorAttachments()->setObject(color_descriptor.get(), 0);
 
   curr_render_encoder_ = NS::TransferPtr(cmd_buf_->renderCommandEncoder(desc.get())->retain());
+  curr_render_encoder_->setArgumentTable(arg_table_.get(),
+                                         MTL::RenderStageFragment | MTL::RenderStageMesh |
+                                             MTL::RenderStageObject | MTL::RenderStageVertex);
   renderpass_info_ = rhi::RenderPassInfo::from(swapchain.desc);
 }
 
@@ -53,21 +78,56 @@ void MetalCmdEncoder::end_rendering() {
 }
 
 void MetalCmdEncoder::bind_pipeline(rhi::Pipeline& pipeline) {
-  // TODO: flush state, barriers, etc
-  ASSERT(device_);
-  ASSERT(curr_render_encoder_);
-  ASSERT(renderpass_info_.rt_count > 0);
-
-  MTL::RenderPipelineState* pso = device_->ensure_render_pipeline(pipeline, renderpass_info_);
-  ASSERT(pso);
-  curr_render_encoder_->setRenderPipelineState(pso);
+  auto* internal_data = to_internal(pipeline);
+  if (internal_data->compute_pipeline) {
+    if (!curr_compute_encoder_) {
+      curr_compute_encoder_ = NS::TransferPtr(cmd_buf_->computeCommandEncoder());
+      curr_compute_encoder_->setArgumentTable(arg_table_.get());
+    }
+    curr_compute_encoder_->setComputePipelineState(internal_data->compute_pipeline.get());
+  } else {
+    ASSERT(curr_render_encoder_);
+    ASSERT(renderpass_info_.rt_count > 0);
+    MTL::RenderPipelineState* pso =
+        device_->get_or_create_render_pipeline(pipeline, renderpass_info_);
+    ASSERT(pso);
+    curr_render_encoder_->setRenderPipelineState(pso);
+  }
 }
 
-void MetalCmdEncoder::draw(uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex,
-                           uint32_t first_instance) {
+void MetalCmdEncoder::draw(const void* root, uint32_t vertex_count, uint32_t instance_count,
+                           uint32_t first_vertex, uint32_t first_instance) {
+  set_root(root);
   ASSERT(curr_render_encoder_);
   curr_render_encoder_->drawPrimitives(MTL::PrimitiveType::PrimitiveTypeTriangle, first_vertex,
                                        vertex_count, instance_count, first_instance);
+}
+
+void MetalCmdEncoder::dispatch(const void* root, uint32_t thread_groups_x, uint32_t thread_groups_y,
+                               uint32_t thread_groups_z) {
+  set_root(root);
+  curr_compute_encoder_->dispatchThreadgroups(
+      // TODO: get the threads per thread group from reflection
+      MTL::Size::Make(thread_groups_x, thread_groups_y, thread_groups_z), MTL::Size::Make(1, 1, 1));
+}
+
+void MetalCmdEncoder::barrier() {
+  if (curr_compute_encoder_) {
+    curr_render_encoder_->barrierAfterStages(MTL::StageAll, MTL::StageAll,
+                                             MTL4::VisibilityOptionDevice);
+  }
+}
+
+void MetalCmdEncoder::set_root(const void* root) const {
+  ASSERT((reinterpret_cast<uintptr_t>(root) & 15ull) == 0);
+  arg_table_->setAddress(reinterpret_cast<uintptr_t>(root), 0);
+}
+
+void MetalCmdEncoder::end_compute() {
+  if (curr_compute_encoder_) {
+    curr_compute_encoder_->endEncoding();
+    curr_compute_encoder_ = nullptr;
+  }
 }
 
 } // namespace gfx::metal

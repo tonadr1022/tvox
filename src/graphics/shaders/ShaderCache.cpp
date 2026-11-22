@@ -149,6 +149,8 @@ std::string compute_content_hash(const CacheUnit& unit,
     const auto bytes = core::read_binary_file(dep);
     if (!bytes) {
       // Missing dep → unstable hash, forces rebuild next time if it reappears.
+      // TODO: this might cause issues if the binary file path is buggy and doesn't exist
+      // pathologically
       fnv1a_update(hash, std::string_view{"<missing>"});
       continue;
     }

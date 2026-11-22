@@ -37,6 +37,8 @@ private:
 
   rhi::Shader basic_vs_;
   rhi::Shader basic_fs_;
+  rhi::Shader basic_cs_;
   rhi::Pipeline basic_;
+  rhi::Pipeline basic_comp_pso_;
 };
 } // namespace gfx

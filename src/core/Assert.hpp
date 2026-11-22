@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/Logger.hpp"
 #include <cstdlib>
 #include <print>
 
@@ -10,6 +11,7 @@
 #define ALL_ASSERTS_ENABLED 1
 #endif
 #endif
+// TODO: clean up this impl
 
 class AlwaysAssert {
 public:
@@ -41,3 +43,17 @@ public:
 #else
 #define ASSERT(expr, ...)
 #endif
+
+#define FATAL_IF(expr, ...)                                                                        \
+  do {                                                                                             \
+    if ((expr)) {                                                                                  \
+      LCRITICAL(__VA_ARGS__);                                                                      \
+      std::abort();                                                                                \
+    }                                                                                              \
+  } while (0)
+
+#define FATAL(expr, ...)                                                                           \
+  do {                                                                                             \
+    LCRITICAL(__VA_ARGS__);                                                                        \
+    std::abort();                                                                                  \
+  } while (0)

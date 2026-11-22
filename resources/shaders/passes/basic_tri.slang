@@ -1,10 +1,11 @@
+#include "basic_shared.h"
 
-typealias vec2 = float2;
-typealias vec3 = float3;
-typealias vec4 = float4;
+[[vk::binding(0)]]
+ConstantBuffer<BasicRoot> g_root : register(b0);
 
 struct VOut {
-  vec4 position : SV_Position;
+  float4 position : SV_Position;
+  float color;
 };
 
 [shader("vertex")]
@@ -17,10 +18,16 @@ VOut vs_main(uint vert_idx: SV_VertexID) {
   } else {
     output.position = float4(0, 0.5, 0, 1);
   }
+
+  // output.color = 0.5;
+  output.color = g_root.color_x;
+  // test
+  // test2
+
   return output;
 }
 
 [shader("fragment")]
 float4 fs_main(VOut input) : SV_Target0 {
-  return float4(1, 1, 1, 1);
+  return float4(input.color, input.color, input.color, 1);
 }

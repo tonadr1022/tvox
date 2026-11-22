@@ -6,4 +6,3 @@ PointerAlignment: Left
 AlwaysBreakTemplateDeclarations: Yes
 BreakAfterAttributes: Always
 AllowShortFunctionsOnASingleLine: None
-AllowShortBlocksOnASingleLine: Never

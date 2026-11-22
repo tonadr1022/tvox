@@ -23,6 +23,10 @@ const ShaderTechniqueDesc::StageDesc* find_stage(const ShaderTechniqueDesc& tech
   return nullptr;
 }
 
+size_t heap_size = 16ull * 1024 * 1024;
+rhi::GpuHeap heap;
+rhi::GpuHeap gpu_heap;
+
 } // namespace
 
 Renderer::Renderer() = default;
@@ -50,6 +54,11 @@ void Renderer::init(const InitInfo& info) {
   });
 
   reload_shaders();
+
+  device_->create_gpu_heap({.size = 1024ull * 1024, .memory_type = rhi::MemoryType::CpuVisible},
+                           heap);
+  device_->create_gpu_heap({.size = 1024ull * 1024, .memory_type = rhi::MemoryType::GpuOnly},
+                           gpu_heap);
 }
 
 void Renderer::render() {
@@ -65,11 +74,27 @@ void Renderer::render() {
   }
 
   auto* enc = device_->begin_cmd_encoder();
+
+  enc->bind_pipeline(basic_comp_pso_);
+  // TODO: allocate gpu mem
+
+  struct RootData {
+    float* output_result;
+    float color_x;
+    float padding0;
+  } root{.output_result = (float*)gpu_heap.range.gpu, .color_x = 0.9, .padding0 = 0};
+  ASSERT(heap.range.size > sizeof(RootData));
+  memcpy(heap.range.cpu, &root, sizeof(RootData));
+
+  enc->dispatch(heap.range.gpu, 1, 1, 1);
+  enc->barrier();
+
   enc->begin_rendering(swapchain_);
   enc->bind_pipeline(basic_);
-  enc->draw(3, 1, 0, 0);
+  enc->draw(heap.range.gpu, 3, 1, 0, 0);
 
   enc->end_rendering();
+
   device_->end_cmd_encoder(enc);
   device_->submit_queue();
 }
@@ -84,17 +109,16 @@ void Renderer::reload_shaders() {
 
   load_shader(basic_vs_, "basic_tri", rhi::ShaderType::Vertex);
   load_shader(basic_fs_, "basic_tri", rhi::ShaderType::Fragment);
+  load_shader(basic_cs_, "basic", rhi::ShaderType::Compute);
 
   device_->create_pipeline(
       rhi::PipelineDesc{.vertex_shader = &basic_vs_, .fragment_shader = &basic_fs_}, basic_);
+  device_->create_pipeline(basic_cs_, basic_comp_pso_);
 }
 
 void Renderer::load_shader(rhi::Shader& shader, std::string_view technique, rhi::ShaderType stage) {
   const ShaderTechniqueDesc* tech = ShaderTechniqueRegistry::find(technique);
-  if (!tech) {
-    LERROR("unknown technique '{}'", technique);
-    return;
-  }
+  FATAL_IF(!tech, "unknown technique '{}'", technique);
 
   const ShaderTechniqueDesc::StageDesc* stage_desc = find_stage(*tech, stage);
   if (!stage_desc) {

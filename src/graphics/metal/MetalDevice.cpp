@@ -10,6 +10,10 @@
 #include "graphics/rhi/Graphics.hpp"
 
 #include <Foundation/NSSharedPtr.hpp>
+#include <Metal/MTLDevice.hpp>
+#include <Metal/MTLHeap.hpp>
+#include <Metal/MTLResidencySet.hpp>
+#include <Metal/MTLResource.hpp>
 #include <QuartzCore/CAMetalLayer.hpp>
 #include <string>
 
@@ -24,6 +28,10 @@ MTL::PixelFormat to_metal_format(rhi::Format format) {
     return MTL::PixelFormatInvalid;
   }
   return MTL::PixelFormatInvalid;
+}
+
+NS::SharedPtr<NS::String> make_ns_string(const char* str) {
+  return NS::TransferPtr(NS::String::string(str, NS::UTF8StringEncoding));
 }
 
 } // namespace
@@ -42,10 +50,17 @@ void MetalDevice::init() {
     frame.cmd_allocator = NS::TransferPtr(device_->newCommandAllocator());
     frame.cmd_buf = NS::TransferPtr(device_->newCommandBuffer());
     frame.cmd_encoder.emplace();
-    frame.cmd_encoder->set_device(this);
-    frame.cmd_encoder->set_cmd_buffer(frame.cmd_buf);
+    frame.cmd_encoder->init(this, frame.cmd_buf);
     frame.fence = NS::TransferPtr(device_->newSharedEvent());
   }
+
+  NS::Error* error{};
+  auto residency_set_descriptor = NS::TransferPtr(MTL::ResidencySetDescriptor::alloc()->init());
+  residency_set_descriptor->setInitialCapacity(256);
+  residency_set_descriptor->setLabel(make_ns_string("main_residency_set").get());
+
+  main_residency_set_ =
+      NS::TransferPtr(device_->newResidencySet(residency_set_descriptor.get(), &error));
 }
 
 void MetalDevice::create_swapchain(const rhi::SwapchainDesc& desc, SDL_Window* window,
@@ -76,11 +91,6 @@ void MetalDevice::create_swapchain(const rhi::SwapchainDesc& desc, SDL_Window* w
   auto* layer = internal_data->layer.get();
   layer->setDrawableSize(CGSize{.width = static_cast<CGFloat>(desc.width),
                                 .height = static_cast<CGFloat>(desc.height)});
-}
-
-void MetalDevice::create_pipeline(rhi::GraphicsPipelineCreateInfo&) {
-  NS::SharedPtr<MTL4::RenderPipelineDescriptor> desc =
-      NS::TransferPtr(MTL4::RenderPipelineDescriptor::alloc()->init());
 }
 
 bool MetalDevice::create_shader(rhi::ShaderType type, const void* data, size_t size,
@@ -115,14 +125,6 @@ bool MetalDevice::create_shader(rhi::ShaderType type, const void* data, size_t s
 
   // store compute pipeline directly on the shader
   if (success && type == rhi::ShaderType::Compute) {
-    internal_data->compute_pipeline =
-        NS::TransferPtr(device_->newComputePipelineState(internal_data->function.get(), &error));
-    if (error) {
-      auto* desc = error->localizedDescription();
-      LOG_ASSERT(0, "{}", desc->utf8String());
-      error->release();
-      success = false;
-    }
   }
 
   return success;
@@ -132,13 +134,80 @@ bool MetalDevice::create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& 
   pipeline.desc = desc;
   pipeline.internal_data.reset();
   pipeline.internal_data = wi::allocator::make_shared<Pipeline_Metal>();
+  // TODO: wtf are we doing here.
   pipelines_cache_.clear();
   return true;
 }
 
+bool MetalDevice::create_gpu_heap(const rhi::GpuHeapDesc& desc, rhi::GpuHeap& heap) {
+  heap.internal_data.reset();
+  heap.internal_data = wi::allocator::make_shared<GpuHeap_Metal>();
+  auto* internal_data = to_internal(heap);
+
+  MTL::ResourceOptions options{};
+  switch (desc.memory_type) {
+  case rhi::MemoryType::GpuOnly:
+    options |= MTL::ResourceStorageModePrivate;
+  case rhi::MemoryType::CpuVisible:
+  case rhi::MemoryType::Readback:
+    options |= MTL::ResourceStorageModeShared;
+    break;
+  }
+  options |= MTL::ResourceOptionCPUCacheModeDefault;
+
+  MTL::SizeAndAlign requirements = device_->heapBufferSizeAndAlign(desc.size, options);
+  if (!requirements.size || !requirements.align) {
+    LERROR("GPU heap size and alignment requuirements insufficient");
+    return false;
+  }
+
+  auto heap_descriptor = NS::TransferPtr(MTL::HeapDescriptor::alloc()->init());
+  heap_descriptor->setSize(align_up(desc.size, requirements.align));
+  heap_descriptor->setHazardTrackingMode(MTL::HazardTrackingModeUntracked);
+  // TODO: maybe support auto, depends on workload
+  heap_descriptor->setType(MTL::HeapTypePlacement);
+  heap_descriptor->setResourceOptions(options);
+
+  internal_data->heap = NS::TransferPtr(device_->newHeap(heap_descriptor.get()));
+  internal_data->buffer = NS::TransferPtr(internal_data->heap->newBuffer(desc.size, options, 0));
+  make_resident(internal_data->buffer.get()); // TODO: heap for textures?
+
+  if (desc.memory_type != rhi::MemoryType::GpuOnly) {
+    heap.range.cpu = reinterpret_cast<std::byte*>(internal_data->buffer->contents());
+  } else {
+    heap.range.cpu = nullptr;
+  }
+  heap.range.gpu = reinterpret_cast<std::byte*>(internal_data->buffer->gpuAddress());
+  heap.range.size = desc.size;
+
+  return true;
+}
+
+bool MetalDevice::create_pipeline(const rhi::Shader& compute_shader, rhi::Pipeline& pipeline) {
+  pipeline.desc = {};
+  pipeline.internal_data.reset();
+  pipeline.internal_data = wi::allocator::make_shared<Pipeline_Metal>();
+
+  auto* internal_data = to_internal(pipeline);
+
+  auto* compute_shader_internal_data = to_internal(compute_shader);
+
+  NS::Error* error{};
+  internal_data->compute_pipeline = NS::TransferPtr(
+      device_->newComputePipelineState(compute_shader_internal_data->function.get(), &error));
+
+  if (error) {
+    auto* desc = error->localizedDescription();
+    LOG_ASSERT(0, "{}", desc->utf8String());
+    error->release();
+    return false;
+  }
+  return true;
+}
+
 MTL::RenderPipelineState*
-MetalDevice::ensure_render_pipeline(rhi::Pipeline& pipeline,
-                                    const rhi::RenderPassInfo& renderpass_info) {
+MetalDevice::get_or_create_render_pipeline(rhi::Pipeline& pipeline,
+                                           const rhi::RenderPassInfo& renderpass_info) {
   rhi::PipelineHash hash;
   hash.pipeline = &pipeline;
   hash.renderpass_hash = renderpass_info.get_hash();
@@ -241,6 +310,11 @@ void MetalDevice::submit_queue() {
   // wait for the fence from FRAMES_IN_FLIGHT frames ago
   frame = curr_frame();
   frame.fence->waitUntilSignaledValue(frame.fence_value, UINT64_MAX);
+}
+
+void MetalDevice::make_resident(MTL::Allocation* buf) {
+  main_residency_set_->addAllocation(buf);
+  main_residency_set_->commit();
 }
 
 } // namespace gfx::metal

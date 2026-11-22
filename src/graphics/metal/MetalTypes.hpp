@@ -1,6 +1,7 @@
 #pragma once
 
 // clang-format off
+#include "graphics/rhi/Graphics.hpp"
 #include <type_traits> // IWYU pragma: keep
 #include <Foundation/NSSharedPtr.hpp>
 // clang-format on
@@ -23,11 +24,16 @@ struct Swapchain_Metal {
 struct Shader_Metal {
   NS::SharedPtr<MTL::Library> library;
   NS::SharedPtr<MTL::Function> function;
-  NS::SharedPtr<MTL::ComputePipelineState> compute_pipeline;
 };
 
 struct Pipeline_Metal {
   NS::SharedPtr<MTL::RenderPipelineState> render_pipeline;
+  NS::SharedPtr<MTL::ComputePipelineState> compute_pipeline;
+};
+
+struct GpuHeap_Metal {
+  NS::SharedPtr<MTL::Heap> heap;
+  NS::SharedPtr<MTL::Buffer> buffer;
 };
 
 template <typename T>
@@ -39,20 +45,18 @@ struct Shader;
 struct Pipeline;
 } // namespace gfx::rhi
 
-template <>
-struct MetalType<gfx::rhi::Swapchain> {
-  using type = Swapchain_Metal;
-};
+#define MAKE_METAL_TYPE(name)                                                                      \
+  template <>                                                                                      \
+  struct MetalType<gfx::rhi::name> {                                                               \
+    using type = name##_Metal;                                                                     \
+  };
 
-template <>
-struct MetalType<gfx::rhi::Shader> {
-  using type = Shader_Metal;
-};
+MAKE_METAL_TYPE(Swapchain)
+MAKE_METAL_TYPE(Shader)
+MAKE_METAL_TYPE(Pipeline)
+MAKE_METAL_TYPE(GpuHeap)
 
-template <>
-struct MetalType<gfx::rhi::Pipeline> {
-  using type = Pipeline_Metal;
-};
+#undef MAKE_METAL_TYPE
 
 template <typename T>
 typename MetalType<T>::type* to_internal(const T& param) {
