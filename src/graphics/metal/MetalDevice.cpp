@@ -61,6 +61,7 @@ void MetalDevice::init() {
 
   main_residency_set_ =
       NS::TransferPtr(device_->newResidencySet(residency_set_descriptor.get(), &error));
+  queue_->addResidencySet(main_residency_set_.get());
 }
 
 void MetalDevice::create_swapchain(const rhi::SwapchainDesc& desc, SDL_Window* window,

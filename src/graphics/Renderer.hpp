@@ -40,5 +40,7 @@ private:
   rhi::Shader basic_cs_;
   rhi::Pipeline basic_;
   rhi::Pipeline basic_comp_pso_;
+  size_t frame_num_{};
+  size_t frames_in_flight_{2};
 };
 } // namespace gfx

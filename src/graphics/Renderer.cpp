@@ -26,6 +26,7 @@ const ShaderTechniqueDesc::StageDesc* find_stage(const ShaderTechniqueDesc& tech
 size_t heap_size = 16ull * 1024 * 1024;
 rhi::GpuHeap heap;
 rhi::GpuHeap gpu_heap;
+uint64_t last_time{};
 
 } // namespace
 
@@ -75,28 +76,37 @@ void Renderer::render() {
 
   auto* enc = device_->begin_cmd_encoder();
 
+  auto time = SDL_GetTicksNS();
+  auto elapsed = time - last_time;
+  float elapsed_seconds = (float)elapsed / 1000 / 1000 / 1000;
+  last_time = time;
+  static float curr = 0;
+  curr += elapsed_seconds * 10.f;
+
   enc->bind_pipeline(basic_comp_pso_);
   // TODO: allocate gpu mem
-
   struct RootData {
     float* output_result;
     float color_x;
     float padding0;
-  } root{.output_result = (float*)gpu_heap.range.gpu, .color_x = 0.9, .padding0 = 0};
+  } root{.output_result = (float*)gpu_heap.range.gpu, .color_x = std::sin(curr), .padding0 = 0};
   ASSERT(heap.range.size > sizeof(RootData));
-  memcpy(heap.range.cpu, &root, sizeof(RootData));
+  memcpy(heap.range.cpu + (sizeof(RootData) * frame_num_ % frames_in_flight_), &root,
+         sizeof(RootData));
 
-  enc->dispatch(heap.range.gpu, 1, 1, 1);
+  enc->dispatch(heap.range.gpu + (sizeof(RootData) * frame_num_ % frames_in_flight_), 1, 1, 1);
   enc->barrier();
 
   enc->begin_rendering(swapchain_);
   enc->bind_pipeline(basic_);
-  enc->draw(heap.range.gpu, 3, 1, 0, 0);
+  enc->draw(heap.range.gpu + (sizeof(RootData) * frame_num_ % frames_in_flight_), 3, 1, 0, 0);
 
   enc->end_rendering();
 
   device_->end_cmd_encoder(enc);
   device_->submit_queue();
+
+  frame_num_++;
 }
 
 void Renderer::reload_shaders() {

@@ -19,10 +19,7 @@ VOut vs_main(uint vert_idx: SV_VertexID) {
     output.position = float4(0, 0.5, 0, 1);
   }
 
-  // output.color = 0.5;
   output.color = g_root.color_x;
-  // test
-  // test2
 
   return output;
 }
