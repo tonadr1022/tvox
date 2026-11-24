@@ -37,6 +37,7 @@ public:
   bool create_gpu_heap(const rhi::GpuHeapDesc& desc, rhi::GpuHeap& heap) override;
   bool create_shader(rhi::ShaderType type, const void* data, size_t size, rhi::Shader& shader,
                      std::string_view entry_point) override;
+  bool create_buffer(const rhi::BufferDesc& desc, rhi::Buffer& buffer) override;
 
   rhi::CmdEncoder* begin_cmd_encoder() override;
   void end_cmd_encoder(rhi::CmdEncoder* encoder) override;

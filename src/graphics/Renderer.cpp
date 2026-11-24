@@ -10,6 +10,7 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_video.h>
+#include <cstddef>
 
 namespace gfx {
 namespace {
@@ -24,9 +25,6 @@ const ShaderTechniqueDesc::StageDesc* find_stage(const ShaderTechniqueDesc& tech
   return nullptr;
 }
 
-size_t heap_size = 16ull * 1024 * 1024;
-rhi::GpuHeap heap;
-rhi::GpuHeap gpu_heap;
 uint64_t last_time{};
 
 } // namespace
@@ -57,17 +55,14 @@ void Renderer::init(const InitInfo& info) {
 
   reload_shaders();
 
-  device_->create_gpu_heap({.size = 1024ull * 1024 * rhi::k_max_frames_in_flight,
-                            .memory_type = rhi::MemoryType::CpuVisible},
-                           heap);
-  device_->create_gpu_heap({.size = 1024ull * 1024, .memory_type = rhi::MemoryType::GpuOnly},
-                           gpu_heap);
-  cpu_vis_heap_bump_allocator_.emplace(heap.range);
   for (size_t i = 0; i < rhi::k_max_frames_in_flight; i++) {
-    frame_allocators_[i].emplace(rhi::gpu_range(heap.range, 1024ull * 1024 * i));
+    device_->create_buffer({.size = 1024ull * 1024, .memory_type = rhi::MemoryType::CpuVisible},
+                           frame_scratch_buffers_[i]);
+    frame_allocators_[i].emplace(rhi::gpu_cpu_range(frame_scratch_buffers_[i]));
   }
-  gpu_heap_bump_allocator_.emplace(gpu_heap.range);
-  test_gpu_data_allocation_ = gpu_heap_bump_allocator_->allocate<float>(32);
+
+  device_->create_buffer({.size = 1024ull * 1024, .memory_type = rhi::MemoryType::GpuOnly},
+                         test_gpu_allocation_buffer_);
 }
 
 void Renderer::render() {
@@ -92,7 +87,7 @@ void Renderer::render() {
 
   auto root_data_range = frame_allocator->allocate<BasicRoot>(1);
   *root_data_range.cpu = BasicRoot{
-      .output_result = test_gpu_data_allocation_.gpu,
+      .output_result = (float*)test_gpu_allocation_buffer_.gpu_ptr,
       .color_x = std::sin(SDL_GetTicksNS() / 1000.f / 1000.f / 1000.f * 10),
   };
 

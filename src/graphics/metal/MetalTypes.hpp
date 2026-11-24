@@ -36,6 +36,10 @@ struct GpuHeap_Metal {
   NS::SharedPtr<MTL::Buffer> buffer;
 };
 
+struct Buffer_Metal {
+  NS::SharedPtr<MTL::Buffer> buffer;
+};
+
 template <typename T>
 struct MetalType;
 
@@ -55,6 +59,7 @@ MAKE_METAL_TYPE(Swapchain)
 MAKE_METAL_TYPE(Shader)
 MAKE_METAL_TYPE(Pipeline)
 MAKE_METAL_TYPE(GpuHeap)
+MAKE_METAL_TYPE(Buffer)
 
 #undef MAKE_METAL_TYPE
 

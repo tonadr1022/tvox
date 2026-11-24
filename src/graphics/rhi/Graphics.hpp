@@ -95,6 +95,24 @@ struct GpuHeap {
   GpuCpuRange<std::byte> range{};
 };
 
+struct BufferDesc {
+  size_t size{};
+  MemoryType memory_type{MemoryType::GpuOnly};
+};
+
+struct Buffer {
+  wi::allocator::shared_ptr<void> internal_data;
+  BufferDesc desc;
+  void* cpu_ptr{};
+  void* gpu_ptr{};
+};
+
+inline GpuCpuRange<std::byte> gpu_cpu_range(rhi::Buffer& buffer) {
+  return {.cpu = reinterpret_cast<std::byte*>(buffer.cpu_ptr),
+          .gpu = reinterpret_cast<std::byte*>(buffer.gpu_ptr),
+          .size = buffer.desc.size};
+}
+
 struct RenderPassInfo {
   static constexpr uint32_t k_max_rt = 8;
 

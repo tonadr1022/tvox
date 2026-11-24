@@ -149,6 +149,7 @@ bool MetalDevice::create_gpu_heap(const rhi::GpuHeapDesc& desc, rhi::GpuHeap& he
   switch (desc.memory_type) {
   case rhi::MemoryType::GpuOnly:
     options |= MTL::ResourceStorageModePrivate;
+    break;
   case rhi::MemoryType::CpuVisible:
   case rhi::MemoryType::Readback:
     options |= MTL::ResourceStorageModeShared;
@@ -316,6 +317,41 @@ void MetalDevice::submit_queue() {
 void MetalDevice::make_resident(MTL::Allocation* buf) {
   main_residency_set_->addAllocation(buf);
   main_residency_set_->commit();
+}
+
+bool MetalDevice::create_buffer(const rhi::BufferDesc& desc, rhi::Buffer& buffer) {
+  buffer.internal_data.reset();
+  buffer.internal_data = wi::allocator::make_shared<Buffer_Metal>();
+  auto* internal_data = to_internal(buffer);
+  ASSERT(desc.size > 0);
+
+  MTL::ResourceOptions options{};
+  switch (desc.memory_type) {
+  case gfx::rhi::MemoryType::CpuVisible:
+  case gfx::rhi::MemoryType::Readback:
+    options |= MTL::ResourceStorageModeShared;
+    break;
+  case gfx::rhi::MemoryType::GpuOnly:
+    options |= MTL::ResourceStorageModePrivate;
+    break;
+  }
+
+  options |= MTL::ResourceOptionCPUCacheModeDefault;
+
+  auto mtl_buffer = NS::TransferPtr(device_->newBuffer(desc.size, options));
+  buffer.desc = desc;
+  internal_data->buffer = mtl_buffer;
+  make_resident(internal_data->buffer.get());
+
+  if (desc.memory_type == rhi::MemoryType::CpuVisible ||
+      desc.memory_type == rhi::MemoryType::Readback) {
+    buffer.cpu_ptr = mtl_buffer->contents();
+  } else {
+    buffer.cpu_ptr = nullptr;
+  }
+  buffer.gpu_ptr = reinterpret_cast<void*>(mtl_buffer->gpuAddress());
+
+  return true;
 }
 
 } // namespace gfx::metal

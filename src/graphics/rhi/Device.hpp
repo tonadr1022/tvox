@@ -26,6 +26,7 @@ public:
   virtual bool create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& pipeline) = 0;
   virtual bool create_pipeline(const rhi::Shader& compute_shader, rhi::Pipeline& pipeline) = 0;
   virtual bool create_gpu_heap(const rhi::GpuHeapDesc& desc, rhi::GpuHeap& heap) = 0;
+  virtual bool create_buffer(const rhi::BufferDesc& desc, rhi::Buffer& buffer) = 0;
 
   // empty entry_point -> "main"
   virtual bool create_shader(rhi::ShaderType type, const void* data, size_t size,

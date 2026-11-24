@@ -44,9 +44,8 @@ private:
   size_t frame_num_{};
   size_t frames_in_flight_{2};
 
-  std::optional<BumpAllocator> cpu_vis_heap_bump_allocator_;
+  rhi::Buffer frame_scratch_buffers_[2];
   std::optional<BumpAllocator> frame_allocators_[2];
-  std::optional<BumpAllocator> gpu_heap_bump_allocator_;
-  rhi::GpuCpuRange<float> test_gpu_data_allocation_;
+  rhi::Buffer test_gpu_allocation_buffer_;
 };
 } // namespace gfx

@@ -20,7 +20,7 @@ public:
         .gpu = reinterpret_cast<T*>(range_.gpu + reinterpret_cast<std::uintptr_t>(offset_)),
         .size = required_size,
     };
-    offset_ += required_size * sizeof(T);
+    offset_ += required_size;
     return range;
   }
 
