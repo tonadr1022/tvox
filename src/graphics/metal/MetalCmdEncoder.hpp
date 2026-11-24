@@ -35,6 +35,8 @@ public:
   void dispatch(const void* root, uint32_t thread_groups_x, uint32_t thread_groups_y,
                 uint32_t thread_groups_z) override;
   void barrier() override;
+  void copy_buffer_to_buffer(rhi::Buffer& dst, size_t dst_offset, rhi::Buffer& src,
+                             size_t src_offset, size_t size) override;
 
   NS::SharedPtr<MTL4::RenderCommandEncoder> curr_render_encoder_;
   NS::SharedPtr<MTL4::ComputeCommandEncoder> curr_compute_encoder_;
@@ -46,6 +48,7 @@ public:
 private:
   void set_root(const void* root) const;
   void end_compute();
+  void start_compute();
 
   MetalDevice* device_{};
   rhi::RenderPassInfo renderpass_info_{};

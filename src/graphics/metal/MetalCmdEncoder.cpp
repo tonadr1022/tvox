@@ -80,10 +80,7 @@ void MetalCmdEncoder::end_rendering() {
 void MetalCmdEncoder::bind_pipeline(rhi::Pipeline& pipeline) {
   auto* internal_data = to_internal(pipeline);
   if (internal_data->compute_pipeline) {
-    if (!curr_compute_encoder_) {
-      curr_compute_encoder_ = NS::TransferPtr(cmd_buf_->computeCommandEncoder());
-      curr_compute_encoder_->setArgumentTable(arg_table_.get());
-    }
+    start_compute();
     curr_compute_encoder_->setComputePipelineState(internal_data->compute_pipeline.get());
   } else {
     ASSERT(curr_render_encoder_);
@@ -128,6 +125,23 @@ void MetalCmdEncoder::end_compute() {
     curr_compute_encoder_->endEncoding();
     curr_compute_encoder_ = nullptr;
   }
+}
+
+void MetalCmdEncoder::start_compute() {
+  ASSERT(!curr_render_encoder_);
+  if (!curr_compute_encoder_) {
+    curr_compute_encoder_ = NS::TransferPtr(cmd_buf_->computeCommandEncoder());
+    curr_compute_encoder_->setArgumentTable(arg_table_.get());
+  }
+}
+
+void MetalCmdEncoder::copy_buffer_to_buffer(rhi::Buffer& dst, size_t dst_offset, rhi::Buffer& src,
+                                            size_t src_offset, size_t size) {
+  start_compute();
+  auto* src_internal = to_internal(src);
+  auto* dst_internal = to_internal(dst);
+  curr_compute_encoder_->copyFromBuffer(src_internal->buffer.get(), src_offset,
+                                        dst_internal->buffer.get(), dst_offset, size);
 }
 
 } // namespace gfx::metal

@@ -1,22 +1,29 @@
 #include "Renderer.hpp"
 
 #include "basic_shared.h"
+#include "forward_pass_shared.h"
+
 #include "core/Logger.hpp"
+#include "core/Util.hpp"
 #include "graphics/rhi/CmdEncoder.hpp"
 #include "graphics/rhi/Device.hpp"
 #include "graphics/rhi/Graphics.hpp"
 #include "graphics/rhi/ShaderType.hpp"
 #include "graphics/shaders/TechniqueRegistry.hpp"
+#include <glm/vec3.hpp>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_video.h>
 #include <cstddef>
 
 namespace gfx {
+
+using namespace rhi;
+
 namespace {
 
 const ShaderTechniqueDesc::StageDesc* find_stage(const ShaderTechniqueDesc& tech,
-                                                 rhi::ShaderType stage) {
+                                                 ShaderType stage) {
   for (const ShaderTechniqueDesc::StageDesc& desc : tech.stages) {
     if (desc.stage == stage) {
       return &desc;
@@ -55,13 +62,30 @@ void Renderer::init(const InitInfo& info) {
 
   reload_shaders();
 
-  for (size_t i = 0; i < rhi::k_max_frames_in_flight; i++) {
-    device_->create_buffer({.size = 1024ull * 1024, .memory_type = rhi::MemoryType::CpuVisible},
-                           frame_scratch_buffers_[i]);
-    frame_allocators_[i].emplace(rhi::gpu_cpu_range(frame_scratch_buffers_[i]));
+  {
+    // TODO: remove this shit
+    struct Vertex {
+      glm::vec3 position;
+    };
+
+    Vertex verts[] = {
+        {{-0.5, -0.5, 0}},
+        {{0.5, -0.5, 0}},
+        {{0, 0.5, 0}},
+    };
+    device_->create_buffer(
+        {.size = sizeof(Vertex) * ARRAY_SIZE(verts), .memory_type = MemoryType::CpuVisible},
+        vert_buf_);
+    memcpy(vert_buf_.cpu_ptr, verts, sizeof(Vertex) * ARRAY_SIZE(verts));
   }
 
-  device_->create_buffer({.size = 1024ull * 1024, .memory_type = rhi::MemoryType::GpuOnly},
+  for (size_t i = 0; i < k_max_frames_in_flight; i++) {
+    device_->create_buffer({.size = 1024ull * 1024, .memory_type = MemoryType::CpuVisible},
+                           frame_scratch_buffers_[i]);
+    frame_allocators_[i].emplace(gpu_cpu_range(frame_scratch_buffers_[i]));
+  }
+
+  device_->create_buffer({.size = 1024ull * 1024, .memory_type = MemoryType::GpuOnly},
                          test_gpu_allocation_buffer_);
 }
 
@@ -85,18 +109,26 @@ void Renderer::render() {
 
   enc->bind_pipeline(basic_comp_pso_);
 
-  auto root_data_range = frame_allocator->allocate<BasicRoot>(1);
-  *root_data_range.cpu = BasicRoot{
-      .output_result = (float*)test_gpu_allocation_buffer_.gpu_ptr,
+  auto compute_root_data = frame_allocator->allocate<BasicRoot>(1);
+  *compute_root_data.cpu = BasicRoot{
+      .output_result = static_cast<float*>(test_gpu_allocation_buffer_.gpu_ptr),
       .color_x = std::sin(SDL_GetTicksNS() / 1000.f / 1000.f / 1000.f * 10),
   };
 
-  enc->dispatch(root_data_range.gpu, 1, 1, 1);
+  enc->dispatch(compute_root_data.gpu, 1, 1, 1);
   enc->barrier();
 
   enc->begin_rendering(swapchain_);
   enc->bind_pipeline(basic_);
-  enc->draw(root_data_range.gpu, 3, 1, 0, 0);
+
+  auto forward_root_data = frame_allocator->allocate<ForwardRoot>(1);
+  *forward_root_data.cpu = ForwardRoot{
+      .output_result = static_cast<float*>(test_gpu_allocation_buffer_.gpu_ptr),
+      .vertices = reinterpret_cast<Vertex*>(vert_buf_.gpu_ptr),
+      .padding0 = 0,
+  };
+
+  enc->draw(forward_root_data.gpu, 3, 1, 0, 0);
 
   enc->end_rendering();
 
@@ -114,15 +146,15 @@ void Renderer::reload_shaders() {
     LERROR("shader ensure_all failed: {}", stats.first_error);
   }
 
-  load_shader(basic_vs_, "basic_tri", rhi::ShaderType::Vertex);
-  load_shader(basic_fs_, "basic_tri", rhi::ShaderType::Fragment);
-  load_shader(basic_cs_, "basic", rhi::ShaderType::Compute);
+  load_shader(basic_vs_, "basic_tri", ShaderType::Vertex);
+  load_shader(basic_fs_, "basic_tri", ShaderType::Fragment);
+  load_shader(basic_cs_, "basic", ShaderType::Compute);
 
   device_->create_pipeline({.vertex_shader = &basic_vs_, .fragment_shader = &basic_fs_}, basic_);
   device_->create_pipeline(basic_cs_, basic_comp_pso_);
 }
 
-void Renderer::load_shader(rhi::Shader& shader, std::string_view technique, rhi::ShaderType stage) {
+void Renderer::load_shader(Shader& shader, std::string_view technique, ShaderType stage) {
   const ShaderTechniqueDesc* tech = ShaderTechniqueRegistry::find(technique);
   FATAL_IF(!tech, "unknown technique '{}'", technique);
 

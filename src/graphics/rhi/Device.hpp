@@ -1,6 +1,7 @@
 #pragma once
 
 #include "graphics/rhi/Graphics.hpp"
+#include "graphics/rhi/ShaderType.hpp"
 
 #include <memory>
 #include <string_view>

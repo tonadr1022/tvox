@@ -1,7 +1,5 @@
 #pragma once
 
-#include "graphics/rhi/ShaderType.hpp"
-#include "small_vector/small_vector.hpp"
 #include "wicked_engine/wiAllocator.h"
 
 #include <cstdint>
@@ -108,9 +106,11 @@ struct Buffer {
 };
 
 inline GpuCpuRange<std::byte> gpu_cpu_range(rhi::Buffer& buffer) {
-  return {.cpu = reinterpret_cast<std::byte*>(buffer.cpu_ptr),
-          .gpu = reinterpret_cast<std::byte*>(buffer.gpu_ptr),
-          .size = buffer.desc.size};
+  return {
+      .cpu = reinterpret_cast<std::byte*>(buffer.cpu_ptr),
+      .gpu = reinterpret_cast<std::byte*>(buffer.gpu_ptr),
+      .size = buffer.desc.size,
+  };
 }
 
 struct RenderPassInfo {

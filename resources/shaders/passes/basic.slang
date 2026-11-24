@@ -1,8 +1,7 @@
-
 #include "basic_shared.h"
+#include "shader_defines.h"
 
-[[vk::binding(0)]]
-ConstantBuffer<BasicRoot> g_root : register(b0);
+GPU_ROOT(BasicRoot, g_root)
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

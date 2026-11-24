@@ -44,6 +44,7 @@ private:
   size_t frame_num_{};
   size_t frames_in_flight_{2};
 
+  rhi::Buffer vert_buf_;
   rhi::Buffer frame_scratch_buffers_[2];
   std::optional<BumpAllocator> frame_allocators_[2];
   rhi::Buffer test_gpu_allocation_buffer_;

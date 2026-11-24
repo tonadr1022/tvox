@@ -90,8 +90,10 @@ void MetalDevice::create_swapchain(const rhi::SwapchainDesc& desc, SDL_Window* w
   }
 
   auto* layer = internal_data->layer.get();
-  layer->setDrawableSize(CGSize{.width = static_cast<CGFloat>(desc.width),
-                                .height = static_cast<CGFloat>(desc.height)});
+  layer->setDrawableSize(CGSize{
+      .width = static_cast<CGFloat>(desc.width),
+      .height = static_cast<CGFloat>(desc.height),
+  });
 }
 
 bool MetalDevice::create_shader(rhi::ShaderType type, const void* data, size_t size,

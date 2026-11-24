@@ -1,7 +1,6 @@
-#include "basic_shared.h"
+#include "forward_pass_shared.h"
 
-[[vk::binding(0)]]
-ConstantBuffer<BasicRoot> g_root : register(b0);
+GPU_ROOT(ForwardRoot, g_root)
 
 struct VOut {
   float4 position : SV_Position;
@@ -11,15 +10,9 @@ struct VOut {
 [shader("vertex")]
 VOut vs_main(uint vert_idx: SV_VertexID) {
   VOut output;
-  if (vert_idx == 0) {
-    output.position = float4(-0.5, -0.5, 0, 1);
-  } else if (vert_idx == 1) {
-    output.position = float4(0.5, -0.5, 0, 1);
-  } else {
-    output.position = float4(0, 0.5, 0, 1);
-  }
-
-  output.color = g_root.color_x;
+  Vertex vertex = g_root.vertices[vert_idx];
+  output.position = float4(vertex.position, 1.0);
+  output.color = g_root.output_result[0];
 
   return output;
 }
