@@ -7,6 +7,9 @@ class CmdEncoder {
 public:
   virtual ~CmdEncoder() = default;
   virtual void begin_rendering(rhi::Swapchain& swapchain) = 0;
+  virtual void begin_rendering(uint32_t width, uint32_t height,
+                               std::span<rhi::RenderAttInfo> color_atts,
+                               rhi::RenderAttInfo* depth_att) = 0;
   virtual void end_rendering() = 0;
   virtual void bind_pipeline(rhi::Pipeline& pipeline) = 0;
 

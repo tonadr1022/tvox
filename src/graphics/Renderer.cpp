@@ -129,8 +129,23 @@ void Renderer::render() {
     // swapchain resize
     if (w != swapchain_.desc.width || h != swapchain_.desc.height) {
       device_->create_swapchain(
-          {.width = static_cast<uint32_t>(w), .height = static_cast<uint32_t>(h)}, window_,
-          swapchain_);
+          {
+              .width = static_cast<uint32_t>(w),
+              .height = static_cast<uint32_t>(h),
+          },
+          window_, swapchain_);
+      device_->create_texture(color_att_tex_, {
+                                                  .width = static_cast<uint32_t>(w),
+                                                  .height = static_cast<uint32_t>(h),
+                                                  .depth = 1,
+                                                  .format = rhi::Format::RGBA32_FLOAT,
+                                              });
+      device_->create_texture(depth_att_tex_, {
+                                                  .width = static_cast<uint32_t>(w),
+                                                  .height = static_cast<uint32_t>(h),
+                                                  .depth = 1,
+                                                  .format = rhi::Format::D32_FLOAT,
+                                              });
     }
   }
   float aspect = static_cast<float>(w) / static_cast<float>(h);
@@ -157,20 +172,33 @@ void Renderer::render() {
   enc->dispatch(compute_root_data.gpu, 1, 1, 1);
   enc->barrier();
 
-  enc->begin_rendering(swapchain_);
-  enc->bind_pipeline(basic_);
+  {
+    auto depth_att = RenderAttInfo::depth_stencil_att(depth_att_tex_.default_view);
+    RenderAttInfo color_atts[] = {
+        RenderAttInfo::color_att(color_att_tex_.default_view, LoadOp::DontCare,
+                                 {
+                                     .color = glm::vec4{1, 0.5, 0.5, 1},
+                                 }),
+    };
+    enc->begin_rendering(w, h, color_atts, &depth_att);
+    enc->bind_pipeline(basic_);
+    auto forward_root_data = frame_allocator->allocate<ForwardRoot>(1);
+    *forward_root_data.cpu = ForwardRoot{
+        .view_proj = glm::transpose(projection_matrix * view_matrix),
+        .output_result = static_cast<float*>(test_gpu_allocation_buffer_.gpu_ptr),
+        .vertices = reinterpret_cast<Vertex*>(vert_buf_.gpu_ptr),
+        .padding0 = 0,
+    };
+    enc->draw_indexed(forward_root_data.gpu, model_res.indices.size(), index_buf_);
+    enc->end_rendering();
+  }
 
-  auto forward_root_data = frame_allocator->allocate<ForwardRoot>(1);
-  *forward_root_data.cpu = ForwardRoot{
-      .view_proj = glm::transpose(projection_matrix * view_matrix),
-      .output_result = static_cast<float*>(test_gpu_allocation_buffer_.gpu_ptr),
-      .vertices = reinterpret_cast<Vertex*>(vert_buf_.gpu_ptr),
-      .padding0 = 0,
-  };
+  {
+    enc->begin_rendering(swapchain_);
+    // TODO: do we reallly want to do a full screen pass that just writes to the swapchain
 
-  enc->draw_indexed(forward_root_data.gpu, model_res.indices.size(), index_buf_);
-
-  enc->end_rendering();
+    enc->end_rendering();
+  }
 
   device_->end_cmd_encoder(enc);
 

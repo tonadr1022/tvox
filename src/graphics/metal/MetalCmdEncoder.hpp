@@ -23,6 +23,8 @@ class MetalCmdEncoder : public rhi::CmdEncoder {
 public:
   ~MetalCmdEncoder() override;
   void begin_rendering(rhi::Swapchain& swapchain) override;
+  void begin_rendering(uint32_t width, uint32_t height, std::span<rhi::RenderAttInfo> color_atts,
+                       rhi::RenderAttInfo* depth_att) override;
   void end_rendering() override;
   void bind_pipeline(rhi::Pipeline& pipeline) override;
 

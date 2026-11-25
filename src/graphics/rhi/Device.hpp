@@ -32,6 +32,9 @@ public:
   // empty entry_point -> "main"
   virtual bool create_shader(rhi::ShaderType type, const void* data, size_t size,
                              rhi::Shader& shader, std::string_view entry_point) = 0;
+  virtual bool create_texture(rhi::Texture& tex, const rhi::TextureDesc& desc) = 0;
+  virtual bool create_texture_view(rhi::Texture& tex, const rhi::TextureViewDesc& desc,
+                                   rhi::TextureView& tex_view) = 0;
   virtual void submit(std::span<rhi::CmdEncoder*> cmds) = 0;
   virtual rhi::CmdEncoder* begin_cmd_encoder(rhi::CmdPool& pool) = 0;
   virtual void end_cmd_encoder(rhi::CmdEncoder* encoder) = 0;

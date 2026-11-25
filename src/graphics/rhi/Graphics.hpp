@@ -1,9 +1,11 @@
 #pragma once
 
+#include "core/Assert.hpp"
 #include "wicked_engine/wiAllocator.h"
 
 #include <cstdint>
 #include <glm/vec4.hpp>
+#include <span>
 
 struct SDL_Window;
 
@@ -14,6 +16,8 @@ constexpr size_t k_max_frames_in_flight = 2;
 enum class Format : uint8_t {
   Unknown = 0,
   BGRA8_UNORM,
+  RGBA32_FLOAT,
+  D32_FLOAT,
 };
 
 struct SwapchainDesc {
@@ -24,15 +28,28 @@ struct SwapchainDesc {
 struct Swapchain {
   wi::allocator::shared_ptr<void> internal_data;
   SwapchainDesc desc;
+};
 
-  [[nodiscard]]
-  const SwapchainDesc& get_desc() const {
-    return desc;
-  }
+struct TextureDesc {
+  uint32_t width{}, height{}, depth{};
+  uint32_t array_length{1};
+  uint32_t mip_count{1};
+  Format format{};
+};
+
+struct TextureViewDesc {
+  Format format{};
+};
+
+struct TextureView {
+  wi::allocator::shared_ptr<void> internal_data;
+  TextureViewDesc desc{};
 };
 
 struct Texture {
   wi::allocator::shared_ptr<void> internal_data;
+  TextureDesc desc{};
+  TextureView default_view{};
 };
 
 struct ShaderDesc {
@@ -41,7 +58,7 @@ struct ShaderDesc {
 
 struct Shader {
   wi::allocator::shared_ptr<void> internal_data;
-  ShaderDesc desc;
+  ShaderDesc desc{};
 };
 
 struct PipelineDesc {
@@ -119,52 +136,6 @@ inline GpuCpuRange<std::byte> gpu_cpu_range(rhi::Buffer& buffer) {
   };
 }
 
-struct RenderPassInfo {
-  static constexpr uint32_t k_max_rt = 8;
-
-  Format rt_formats[k_max_rt] = {};
-  uint32_t rt_count = 0;
-  Format ds_format = Format::Unknown;
-  uint32_t sample_count = 1;
-
-  constexpr uint64_t get_hash() const {
-    union Hasher {
-      struct {
-        uint64_t rt_format_0 : 6;
-        uint64_t rt_format_1 : 6;
-        uint64_t rt_format_2 : 6;
-        uint64_t rt_format_3 : 6;
-        uint64_t rt_format_4 : 6;
-        uint64_t rt_format_5 : 6;
-        uint64_t rt_format_6 : 6;
-        uint64_t rt_format_7 : 6;
-        uint64_t ds_format : 6;
-        uint64_t sample_count : 3;
-      } bits;
-      uint64_t value;
-    } hasher = {};
-    static_assert(sizeof(Hasher) == sizeof(uint64_t));
-    hasher.bits.rt_format_0 = static_cast<uint64_t>(rt_formats[0]);
-    hasher.bits.rt_format_1 = static_cast<uint64_t>(rt_formats[1]);
-    hasher.bits.rt_format_2 = static_cast<uint64_t>(rt_formats[2]);
-    hasher.bits.rt_format_3 = static_cast<uint64_t>(rt_formats[3]);
-    hasher.bits.rt_format_4 = static_cast<uint64_t>(rt_formats[4]);
-    hasher.bits.rt_format_5 = static_cast<uint64_t>(rt_formats[5]);
-    hasher.bits.rt_format_6 = static_cast<uint64_t>(rt_formats[6]);
-    hasher.bits.rt_format_7 = static_cast<uint64_t>(rt_formats[7]);
-    hasher.bits.ds_format = static_cast<uint64_t>(ds_format);
-    hasher.bits.sample_count = static_cast<uint64_t>(sample_count);
-    return hasher.value;
-  }
-
-  static constexpr RenderPassInfo from(const SwapchainDesc& swapchain_desc) {
-    RenderPassInfo info;
-    info.rt_count = 1;
-    info.rt_formats[0] = swapchain_desc.format;
-    return info;
-  }
-};
-
 struct PipelineHash {
   const Pipeline* pipeline = nullptr;
   uint64_t renderpass_hash = 0;
@@ -198,36 +169,32 @@ union ClearValue {
 struct RenderAttInfo {
   enum class Type : uint8_t { Color, DepthStencil };
 
-  Texture* image;
-  int subresource{-1};
+  TextureView& tex_view;
   Type type{Type::Color};
   LoadOp load_op{LoadOp::Load};
   StoreOp store_op{StoreOp::Store};
-  ClearValue clear_value{};
+  ClearValue clear{};
 
-  static RenderAttInfo color_att(Texture* image, LoadOp load_op = LoadOp::Load,
-                                 ClearValue clear_value = {}, StoreOp store_op = StoreOp::Store,
-                                 int subresource = -1) {
+  static RenderAttInfo color_att(TextureView& tex_view, LoadOp load_op = LoadOp::Load,
+                                 ClearValue clear_value = {}, StoreOp store_op = StoreOp::Store) {
     return {
-        .image = image,
-        .subresource = subresource,
+        .tex_view = tex_view,
         .type = Type::Color,
         .load_op = load_op,
         .store_op = store_op,
-        .clear_value = clear_value,
+        .clear = clear_value,
     };
   }
 
-  static RenderAttInfo depth_stencil_att(Texture* image, LoadOp load_op = LoadOp::Load,
+  static RenderAttInfo depth_stencil_att(TextureView& tex_view, LoadOp load_op = LoadOp::Load,
                                          ClearValue clear_value = {},
-                                         StoreOp store_op = StoreOp::Store, int subresource = -1) {
+                                         StoreOp store_op = StoreOp::Store) {
     return {
-        .image = image,
-        .subresource = subresource,
+        .tex_view = tex_view,
         .type = Type::DepthStencil,
         .load_op = load_op,
         .store_op = store_op,
-        .clear_value = clear_value,
+        .clear = clear_value,
     };
   }
 };
@@ -280,6 +247,68 @@ enum class BorderColor : uint8_t {
   IntOpaqueBlack,
   FloatOpaqueWhite,
   IntOpaqueWhite,
+};
+
+struct RenderPassInfo {
+  static constexpr uint32_t k_max_rt = 8;
+
+  Format rt_formats[k_max_rt] = {};
+  uint32_t rt_count = 0;
+  Format ds_format = Format::Unknown;
+  uint32_t sample_count = 1;
+
+  constexpr uint64_t get_hash() const {
+    union Hasher {
+      struct {
+        uint64_t rt_format_0 : 6;
+        uint64_t rt_format_1 : 6;
+        uint64_t rt_format_2 : 6;
+        uint64_t rt_format_3 : 6;
+        uint64_t rt_format_4 : 6;
+        uint64_t rt_format_5 : 6;
+        uint64_t rt_format_6 : 6;
+        uint64_t rt_format_7 : 6;
+        uint64_t ds_format : 6;
+        uint64_t sample_count : 3;
+      } bits;
+      uint64_t value;
+    } hasher = {};
+    static_assert(sizeof(Hasher) == sizeof(uint64_t));
+    hasher.bits.rt_format_0 = static_cast<uint64_t>(rt_formats[0]);
+    hasher.bits.rt_format_1 = static_cast<uint64_t>(rt_formats[1]);
+    hasher.bits.rt_format_2 = static_cast<uint64_t>(rt_formats[2]);
+    hasher.bits.rt_format_3 = static_cast<uint64_t>(rt_formats[3]);
+    hasher.bits.rt_format_4 = static_cast<uint64_t>(rt_formats[4]);
+    hasher.bits.rt_format_5 = static_cast<uint64_t>(rt_formats[5]);
+    hasher.bits.rt_format_6 = static_cast<uint64_t>(rt_formats[6]);
+    hasher.bits.rt_format_7 = static_cast<uint64_t>(rt_formats[7]);
+    hasher.bits.ds_format = static_cast<uint64_t>(ds_format);
+    hasher.bits.sample_count = static_cast<uint64_t>(sample_count);
+    return hasher.value;
+  }
+
+  static constexpr RenderPassInfo from(const SwapchainDesc& swapchain_desc) {
+    RenderPassInfo info;
+    info.rt_count = 1;
+    info.rt_formats[0] = swapchain_desc.format;
+    return info;
+  }
+
+  static constexpr RenderPassInfo from(std::span<RenderAttInfo> color_atts,
+                                       RenderAttInfo* depth_att) {
+    RenderPassInfo info;
+    info.rt_count = color_atts.size();
+    for (size_t i = 0; i < color_atts.size(); i++) {
+      auto& color_att = color_atts[i];
+      info.rt_formats[i] = color_att.tex_view.desc.format;
+      ASSERT(info.rt_formats[i] != Format::Unknown);
+    }
+    if (depth_att) {
+      info.ds_format = depth_att->tex_view.desc.format;
+    }
+    info.sample_count = 1;
+    return info;
+  }
 };
 
 // allocate a heap. make it resident.

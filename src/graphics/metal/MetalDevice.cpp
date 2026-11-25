@@ -12,8 +12,10 @@
 #include <Foundation/NSSharedPtr.hpp>
 #include <Metal/MTLDevice.hpp>
 #include <Metal/MTLHeap.hpp>
+#include <Metal/MTLPixelFormat.hpp>
 #include <Metal/MTLResidencySet.hpp>
 #include <Metal/MTLResource.hpp>
+#include <Metal/MTLTexture.hpp>
 #include <QuartzCore/CAMetalLayer.hpp>
 #include <string>
 
@@ -24,6 +26,10 @@ MTL::PixelFormat to_metal_format(rhi::Format format) {
   switch (format) {
   case rhi::Format::BGRA8_UNORM:
     return MTL::PixelFormatBGRA8Unorm;
+  case rhi::Format::D32_FLOAT:
+    return MTL::PixelFormatDepth32Float;
+  case rhi::Format::RGBA32_FLOAT:
+    return MTL::PixelFormatRGBA32Float;
   case rhi::Format::Unknown:
     return MTL::PixelFormatInvalid;
   }
@@ -127,6 +133,48 @@ bool MetalDevice::create_shader(rhi::ShaderType type, const void* data, size_t s
   }
 
   return success;
+}
+
+bool MetalDevice::create_texture(rhi::Texture& tex, const rhi::TextureDesc& desc) {
+  tex.internal_data.reset();
+  tex.internal_data = wi::allocator::make_shared<Texture_Metal>();
+  tex.desc = desc;
+
+  auto* internal_data = to_internal(tex);
+  auto tex_desc = NS::TransferPtr(MTL::TextureDescriptor::alloc()->init());
+  tex_desc->setTextureType(MTL::TextureType2D); // TODO: fix this
+  tex_desc->setWidth(desc.width);
+  tex_desc->setHeight(desc.height);
+  tex_desc->setDepth(desc.depth);
+  tex_desc->setPixelFormat(to_metal_format(desc.format));
+  tex_desc->setAllowGPUOptimizedContents(true);
+  tex_desc->setArrayLength(desc.array_length);
+  tex_desc->setMipmapLevelCount(desc.mip_count);
+
+  internal_data->texture = NS::TransferPtr(device_->newTexture(tex_desc.get()));
+  // TODO: create a default view
+
+  return true;
+}
+
+bool MetalDevice::create_texture_view(rhi::Texture& /*tex*/, const rhi::TextureViewDesc& desc,
+                                      rhi::TextureView& tex_view) {
+  tex_view.internal_data.reset();
+  tex_view.internal_data = wi::allocator::make_shared<TextureView_Metal>();
+  tex_view.desc = desc;
+
+  auto tex_view_desc = NS::TransferPtr(MTL::TextureViewDescriptor::alloc()->init());
+  // TODO: set the type
+  tex_view_desc->setTextureType(MTL::TextureType2D);
+  tex_view_desc->setLevelRange(NS::Range::Make(0, 1));
+  tex_view_desc->setSliceRange(NS::Range::Make(0, 1));
+  tex_view_desc->setPixelFormat(MTL::PixelFormatDepth32Float);
+
+  // auto resource_view_pool_desc =
+  // NS::TransferPtr(MTL::ResourceViewPoolDescriptor::alloc()->init());
+  // resource_view_pool_desc->setResourceViewCount(32);
+  // device_->newTextureViewPool();
+  return true;
 }
 
 bool MetalDevice::create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& pipeline) {

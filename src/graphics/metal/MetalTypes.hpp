@@ -52,6 +52,14 @@ struct CmdPool_Metal {
   NS::SharedPtr<MTL4::CommandAllocator> cmd_allocator;
 };
 
+struct Texture_Metal {
+  NS::SharedPtr<MTL::Texture> texture;
+};
+
+struct TextureView_Metal {
+  NS::SharedPtr<MTL::Texture> view_texture;
+};
+
 template <typename T>
 struct MetalType;
 
@@ -67,6 +75,8 @@ MAKE_METAL_TYPE(Pipeline)
 MAKE_METAL_TYPE(GpuHeap)
 MAKE_METAL_TYPE(Buffer)
 MAKE_METAL_TYPE(CmdPool)
+MAKE_METAL_TYPE(Texture)
+MAKE_METAL_TYPE(TextureView)
 
 #undef MAKE_METAL_TYPE
 

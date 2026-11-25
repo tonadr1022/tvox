@@ -3,6 +3,7 @@
 #include "MetalDevice.hpp"
 #include "MetalTypes.hpp"
 #include "core/Assert.hpp"
+#include "graphics/rhi/Graphics.hpp"
 
 #include <Foundation/NSAutoreleasePool.hpp>
 #include <Foundation/NSSharedPtr.hpp>
@@ -12,17 +13,39 @@
 #include <Metal/MTL4RenderPass.hpp>
 #include <Metal/MTLCommandEncoder.hpp>
 #include <Metal/MTLRenderCommandEncoder.hpp>
+#include <Metal/MTLRenderPass.hpp>
 #include <Metal/MTLTypes.hpp>
 #include <Metal/Metal.hpp>
 #include <QuartzCore/CAMetalLayer.hpp>
 
 namespace gfx::metal {
 
+namespace {
+MTL::LoadAction to_metal(rhi::LoadOp load_op) {
+  switch (load_op) {
+  case rhi::LoadOp::Load:
+    return MTL::LoadActionLoad;
+  case rhi::LoadOp::Clear:
+    return MTL::LoadActionClear;
+  case rhi::LoadOp::DontCare:
+    return MTL::LoadActionDontCare;
+  }
+}
+
+MTL::StoreAction to_metal(rhi::StoreOp store_op) {
+  switch (store_op) {
+  case rhi::StoreOp::Store:
+    return MTL::StoreActionStore;
+  case rhi::StoreOp::DontCare:
+    return MTL::StoreActionDontCare;
+  }
+}
+} // namespace
+
 MetalCmdEncoder::~MetalCmdEncoder() = default;
 
 void MetalCmdEncoder::begin_rendering(rhi::Swapchain& swapchain) {
   end_compute();
-  auto autorelease_pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto* internal_data = to_internal(swapchain);
 
   auto* drawable = internal_data->layer->nextDrawable();
@@ -56,6 +79,54 @@ void MetalCmdEncoder::begin_rendering(rhi::Swapchain& swapchain) {
                                          MTL::RenderStageFragment | MTL::RenderStageMesh |
                                              MTL::RenderStageObject | MTL::RenderStageVertex);
   renderpass_info_ = rhi::RenderPassInfo::from(swapchain.desc);
+}
+
+void MetalCmdEncoder::begin_rendering(uint32_t width, uint32_t height,
+                                      std::span<rhi::RenderAttInfo> color_atts,
+                                      rhi::RenderAttInfo* depth_att) {
+  end_compute();
+  auto render_pass_desc = NS::TransferPtr(MTL4::RenderPassDescriptor::alloc()->init());
+  render_pass_desc->setRenderTargetWidth(width);
+  render_pass_desc->setRenderTargetWidth(height);
+  render_pass_desc->setRenderTargetArrayLength(1);
+
+  for (size_t color_desc_i = 0; color_desc_i < color_atts.size(); color_desc_i++) {
+    auto& color_att = color_atts[color_desc_i];
+    auto* tex_view_internal_data = to_internal(color_att.tex_view);
+    auto color_desc = NS::TransferPtr(MTL::RenderPassColorAttachmentDescriptor::alloc()->init());
+    color_desc->setTexture(tex_view_internal_data->view_texture.get());
+    color_desc->setClearColor(
+        MTL::ClearColor::Make(color_att.clear.color.x, color_att.clear.color.y,
+                              color_att.clear.color.z, color_att.clear.color.w));
+    color_desc->setLevel(0);
+    color_desc->setSlice(0);
+    color_desc->setLoadAction(MTL::LoadActionClear);
+    color_desc->setStoreAction(MTL::StoreActionStore);
+
+    render_pass_desc->colorAttachments()->setObject(color_desc.get(), color_desc_i);
+  }
+
+  if (depth_att) {
+    auto* tex_view_internal_data = to_internal(depth_att->tex_view);
+    auto depth_att_desc =
+        NS::TransferPtr(MTL::RenderPassDepthAttachmentDescriptor::alloc()->init());
+    depth_att_desc->setLevel(0);
+    depth_att_desc->setSlice(0);
+    depth_att_desc->setLoadAction(to_metal(depth_att->load_op));
+    depth_att_desc->setStoreAction(to_metal(depth_att->store_op));
+    depth_att_desc->setTexture(tex_view_internal_data->view_texture.get());
+    depth_att_desc->setClearDepth(depth_att->clear.depth_stencil.depth);
+    render_pass_desc->setDepthAttachment(depth_att_desc.get());
+  }
+
+  // TODO: do we need retain
+  // TODO: share with swapchain code
+  curr_render_encoder_ =
+      NS::TransferPtr(cmd_buf_->renderCommandEncoder(render_pass_desc.get())->retain());
+  curr_render_encoder_->setArgumentTable(arg_table_.get(),
+                                         MTL::RenderStageFragment | MTL::RenderStageMesh |
+                                             MTL::RenderStageObject | MTL::RenderStageVertex);
+  renderpass_info_ = rhi::RenderPassInfo::from(color_atts, depth_att);
 }
 
 void MetalCmdEncoder::end_rendering() {

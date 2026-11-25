@@ -35,6 +35,9 @@ public:
   bool create_gpu_heap(const rhi::GpuHeapDesc& desc, rhi::GpuHeap& heap) override;
   bool create_shader(rhi::ShaderType type, const void* data, size_t size, rhi::Shader& shader,
                      std::string_view entry_point) override;
+  bool create_texture(rhi::Texture& tex, const rhi::TextureDesc& desc) override;
+  bool create_texture_view(rhi::Texture& tex, const rhi::TextureViewDesc& desc,
+                           rhi::TextureView& tex_view) override;
   bool create_buffer(const rhi::BufferDesc& desc, rhi::Buffer& buffer) override;
   bool create_cmd_pool(rhi::CmdPool& pool) override;
   void reset_cmd_pool(rhi::CmdPool& pool) override;
