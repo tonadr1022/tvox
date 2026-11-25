@@ -52,6 +52,9 @@ void Renderer::init(const InitInfo& info) {
 
   model_res = load_model("/Users/tony/personal/tvox/resources/models/Cube/glTF/Cube.gltf");
 
+  texture_descriptor_index_allocator_.init(
+      512); // TODO: don't hardcode this. might need to make desc heap public
+
   {
     int w{}, h{};
     SDL_GetWindowSize(window_, &w, &h);
@@ -75,11 +78,6 @@ void Renderer::init(const InitInfo& info) {
   }
 
   {
-    // Vertex verts[] = {
-    //     {{-0.5, -0.5, 0}},
-    //     {{0.5, -0.5, 0}},
-    //     {{0, 0.5, 0}},
-    // };
     auto& verts = model_res.vertices;
     device_->create_buffer(
         {.size = sizeof(Vertex) * verts.size(), .memory_type = MemoryType::GpuOnly}, vert_buf_);
@@ -189,6 +187,7 @@ void Renderer::render() {
     auto post_process_root = frame_allocator->allocate<PostProcessRoot>(1);
     *post_process_root.cpu = PostProcessRoot{
         .mult = std::sin(SDL_GetTicksNS() / 1000.f / 1000.f / 1000.f * 10),
+        .tex = color_att_tex_.index,
     };
     enc->draw(post_process_root.gpu, 3, 1, 0, 0);
 
@@ -226,22 +225,27 @@ void Renderer::reload_shaders() {
 void Renderer::recreate_textures() {
   int w{}, h{};
   SDL_GetWindowSize(window_, &w, &h);
-  device_->create_texture(color_att_tex_, {
-                                              .width = static_cast<uint32_t>(w),
-                                              .height = static_cast<uint32_t>(h),
-                                              .depth = 1,
-                                              .format = rhi::Format::RGBA32_FLOAT,
-                                              .usage = TextureUsage::RenderTarget,
-                                          });
-  device_->create_texture(depth_att_tex_, {
-                                              .width = static_cast<uint32_t>(w),
-                                              .height = static_cast<uint32_t>(h),
-                                              .depth = 1,
-                                              .format = rhi::Format::D32_FLOAT,
-                                              .usage = TextureUsage::RenderTarget,
-                                          });
 
-  device_->write_texture_desc({.texture_type = TextureType::D2}, color_att_tex_, 0);
+  auto create_texture = [this](BindlessTexture& texture, const rhi::TextureDesc& desc) {
+    device_->create_texture(texture, desc);
+    texture.index = texture_descriptor_index_allocator_.alloc();
+    device_->write_texture_desc({.texture_type = texture.desc.type}, color_att_tex_, texture.index);
+  };
+
+  create_texture(color_att_tex_, {
+                                     .width = static_cast<uint32_t>(w),
+                                     .height = static_cast<uint32_t>(h),
+                                     .depth = 1,
+                                     .format = rhi::Format::RGBA32_FLOAT,
+                                     .usage = TextureUsage::RenderTarget,
+                                 });
+  create_texture(depth_att_tex_, {
+                                     .width = static_cast<uint32_t>(w),
+                                     .height = static_cast<uint32_t>(h),
+                                     .depth = 1,
+                                     .format = rhi::Format::D32_FLOAT,
+                                     .usage = TextureUsage::RenderTarget,
+                                 });
 }
 
 void Renderer::load_shader(Shader& shader, std::string_view technique, ShaderType stage) {

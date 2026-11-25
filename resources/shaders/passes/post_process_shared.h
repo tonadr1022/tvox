@@ -1,8 +1,10 @@
 #pragma once
 
+#include "shader_defines.h" // IWYU pragma: keep
+
 struct PostProcessRoot {
   float mult;
-  float padding0;
+  uint32_t tex;
   float padding1;
   float padding2;
 };

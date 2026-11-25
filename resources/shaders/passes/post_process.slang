@@ -18,7 +18,7 @@ VOut vs_main(uint vert_idx: SV_VertexID) {
 
 [shader("fragment")]
 float4 fs_main(VOut input) : SV_Target0 {
-  Texture2D<float3> tex = gpu_texture<Texture2D<float3>>(0);
+  Texture2D<float3> tex = gpu_texture<Texture2D<float3>>(g_root.tex);
   int3 location = int3(input.pos.xyz);
   float3 color = tex.Load(location);
   color.x *= (g_root.mult + 1.0) * 0.5;

@@ -2,6 +2,7 @@
 
 #if !defined(__SLANG__)
 
+#include <cstddef>
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 

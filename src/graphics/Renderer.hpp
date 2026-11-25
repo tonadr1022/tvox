@@ -3,6 +3,7 @@
 #include "graphics/rhi/Graphics.hpp"
 #include "graphics/shaders/ShaderCache.hpp"
 #include "graphics/util/BumpAllocator.hpp"
+#include "graphics/util/IndexAllocator.hpp"
 
 #include <filesystem>
 #include <memory>
@@ -13,6 +14,10 @@ namespace gfx {
 namespace rhi {
 class Device;
 }
+
+struct BindlessTexture : rhi::Texture {
+  uint32_t index;
+};
 
 class Renderer {
 public:
@@ -48,13 +53,14 @@ private:
   size_t frame_num_{};
   size_t frames_in_flight_{2};
 
-  rhi::Texture color_att_tex_;
-  rhi::Texture depth_att_tex_;
+  BindlessTexture color_att_tex_;
+  BindlessTexture depth_att_tex_;
   rhi::Buffer vert_buf_;
   rhi::Buffer index_buf_;
   rhi::Buffer frame_scratch_buffers_[2];
   std::optional<BumpAllocator> frame_allocators_[2];
   rhi::Buffer test_gpu_allocation_buffer_;
   rhi::CmdPool cmd_pools_[rhi::k_max_frames_in_flight];
+  IndexAllocator texture_descriptor_index_allocator_;
 };
 } // namespace gfx
