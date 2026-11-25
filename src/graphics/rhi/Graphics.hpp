@@ -9,6 +9,8 @@ struct SDL_Window;
 
 namespace gfx::rhi {
 
+constexpr size_t k_max_frames_in_flight = 2;
+
 enum class Format : uint8_t {
   Unknown = 0,
   BGRA8_UNORM,
@@ -103,6 +105,10 @@ struct Buffer {
   BufferDesc desc;
   void* cpu_ptr{};
   void* gpu_ptr{};
+};
+
+struct CmdPool {
+  wi::allocator::shared_ptr<void> internal_data;
 };
 
 inline GpuCpuRange<std::byte> gpu_cpu_range(rhi::Buffer& buffer) {
@@ -202,23 +208,27 @@ struct RenderAttInfo {
   static RenderAttInfo color_att(Texture* image, LoadOp load_op = LoadOp::Load,
                                  ClearValue clear_value = {}, StoreOp store_op = StoreOp::Store,
                                  int subresource = -1) {
-    return {.image = image,
-            .subresource = subresource,
-            .type = Type::Color,
-            .load_op = load_op,
-            .store_op = store_op,
-            .clear_value = clear_value};
+    return {
+        .image = image,
+        .subresource = subresource,
+        .type = Type::Color,
+        .load_op = load_op,
+        .store_op = store_op,
+        .clear_value = clear_value,
+    };
   }
 
   static RenderAttInfo depth_stencil_att(Texture* image, LoadOp load_op = LoadOp::Load,
                                          ClearValue clear_value = {},
                                          StoreOp store_op = StoreOp::Store, int subresource = -1) {
-    return {.image = image,
-            .subresource = subresource,
-            .type = Type::DepthStencil,
-            .load_op = load_op,
-            .store_op = store_op,
-            .clear_value = clear_value};
+    return {
+        .image = image,
+        .subresource = subresource,
+        .type = Type::DepthStencil,
+        .load_op = load_op,
+        .store_op = store_op,
+        .clear_value = clear_value,
+    };
   }
 };
 
@@ -240,7 +250,7 @@ enum class CompareOp : uint8_t {
   Greater,
   NotEqual,
   GreaterOrEqual,
-  Always
+  Always,
 };
 
 enum class PrimitiveTopology : uint8_t {
@@ -250,7 +260,7 @@ enum class PrimitiveTopology : uint8_t {
   TriangleList,
   TriangleStrip,
   TriangleFan,
-  PatchList
+  PatchList,
 };
 
 enum class FilterMode : uint8_t { Nearest, Linear };
@@ -260,7 +270,7 @@ enum class AddressMode : uint8_t {
   MirroredRepeat,
   ClampToEdge,
   ClampToBorder,
-  MirrorClampToEdge
+  MirrorClampToEdge,
 };
 
 enum class BorderColor : uint8_t {
@@ -269,7 +279,7 @@ enum class BorderColor : uint8_t {
   FloatOpaqueBlack,
   IntOpaqueBlack,
   FloatOpaqueWhite,
-  IntOpaqueWhite
+  IntOpaqueWhite,
 };
 
 // allocate a heap. make it resident.

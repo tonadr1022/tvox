@@ -4,12 +4,15 @@
 #include "forward_pass_shared.h"
 
 #include "core/Logger.hpp"
-#include "core/Util.hpp"
+#include "glm/ext/matrix_clip_space.hpp"
+#include "glm/ext/matrix_transform.hpp"
+#include "graphics/ModelLoad.hpp"
 #include "graphics/rhi/CmdEncoder.hpp"
 #include "graphics/rhi/Device.hpp"
 #include "graphics/rhi/Graphics.hpp"
 #include "graphics/rhi/ShaderType.hpp"
 #include "graphics/shaders/TechniqueRegistry.hpp"
+#include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
 #include <SDL3/SDL.h>
@@ -33,6 +36,7 @@ const ShaderTechniqueDesc::StageDesc* find_stage(const ShaderTechniqueDesc& tech
 }
 
 uint64_t last_time{};
+Model model_res;
 
 } // namespace
 
@@ -44,6 +48,8 @@ void Renderer::init(const InitInfo& info) {
 
   device_ = make_device();
   device_->init();
+
+  model_res = load_model("/Users/tony/personal/tvox/resources/models/Cube/glTF/Cube.gltf");
 
   {
     int w{}, h{};
@@ -62,21 +68,44 @@ void Renderer::init(const InitInfo& info) {
 
   reload_shaders();
 
-  {
-    // TODO: remove this shit
-    struct Vertex {
-      glm::vec3 position;
-    };
+  for (auto& cmd_pool : cmd_pools_) {
+    device_->create_cmd_pool(cmd_pool);
+  }
 
-    Vertex verts[] = {
-        {{-0.5, -0.5, 0}},
-        {{0.5, -0.5, 0}},
-        {{0, 0.5, 0}},
-    };
+  {
+    // Vertex verts[] = {
+    //     {{-0.5, -0.5, 0}},
+    //     {{0.5, -0.5, 0}},
+    //     {{0, 0.5, 0}},
+    // };
+    auto& verts = model_res.vertices;
     device_->create_buffer(
-        {.size = sizeof(Vertex) * ARRAY_SIZE(verts), .memory_type = MemoryType::CpuVisible},
-        vert_buf_);
-    memcpy(vert_buf_.cpu_ptr, verts, sizeof(Vertex) * ARRAY_SIZE(verts));
+        {.size = sizeof(Vertex) * verts.size(), .memory_type = MemoryType::GpuOnly}, vert_buf_);
+    device_->create_buffer(
+        {.size = sizeof(uint32_t) * model_res.indices.size(), .memory_type = MemoryType::GpuOnly},
+        index_buf_);
+
+    {
+      rhi::Buffer scratch_upload_buf;
+      device_->create_buffer({.size = 1024ull * 1024 * 10, .memory_type = MemoryType::CpuVisible},
+                             scratch_upload_buf);
+      size_t vertex_buf_size = sizeof(Vertex) * verts.size();
+      memcpy(scratch_upload_buf.cpu_ptr, verts.data(), vertex_buf_size);
+      auto* enc = device_->begin_cmd_encoder(cmd_pools_[0]);
+      enc->copy_buffer_to_buffer(vert_buf_, 0, scratch_upload_buf, 0, vertex_buf_size);
+
+      // indices
+      memcpy(static_cast<uint8_t*>(scratch_upload_buf.cpu_ptr) + vertex_buf_size,
+             model_res.indices.data(), sizeof(uint32_t) * model_res.indices.size());
+      enc->copy_buffer_to_buffer(index_buf_, 0, scratch_upload_buf, vertex_buf_size,
+                                 sizeof(uint32_t) * model_res.indices.size());
+
+      device_->end_cmd_encoder(enc);
+
+      // TODO: is this really where we want to be submitting
+      rhi::CmdEncoder* cmds[] = {enc};
+      device_->submit(cmds);
+    }
   }
 
   for (size_t i = 0; i < k_max_frames_in_flight; i++) {
@@ -90,22 +119,32 @@ void Renderer::init(const InitInfo& info) {
 }
 
 void Renderer::render() {
+
+  int w{}, h{};
+  SDL_GetWindowSize(window_, &w, &h);
+  if (w <= 0 || h <= 0) {
+    return;
+  }
   {
     // swapchain resize
-    int w{}, h{};
-    SDL_GetWindowSize(window_, &w, &h);
     if (w != swapchain_.desc.width || h != swapchain_.desc.height) {
       device_->create_swapchain(
           {.width = static_cast<uint32_t>(w), .height = static_cast<uint32_t>(h)}, window_,
           swapchain_);
     }
   }
+  float aspect = static_cast<float>(w) / static_cast<float>(h);
+
+  glm::mat4 projection_matrix = glm::perspective(glm::radians(70.f), aspect, 0.1f, 500.f);
+  glm::mat4 view_matrix = glm::lookAt(glm::vec3{0, 5, 5}, glm::vec3{0, 0, 0}, glm::vec3{0, 1, 0});
+
+  // TODO: wait for timeline semaphore
 
   size_t frame_in_flight = frame_num_ % frames_in_flight_;
   auto& frame_allocator = frame_allocators_[frame_in_flight];
   frame_allocator->reset();
 
-  auto* enc = device_->begin_cmd_encoder();
+  auto* enc = device_->begin_cmd_encoder(cmd_pools_[frame_in_flight]);
 
   enc->bind_pipeline(basic_comp_pso_);
 
@@ -123,17 +162,20 @@ void Renderer::render() {
 
   auto forward_root_data = frame_allocator->allocate<ForwardRoot>(1);
   *forward_root_data.cpu = ForwardRoot{
+      .view_proj = glm::transpose(projection_matrix * view_matrix),
       .output_result = static_cast<float*>(test_gpu_allocation_buffer_.gpu_ptr),
       .vertices = reinterpret_cast<Vertex*>(vert_buf_.gpu_ptr),
       .padding0 = 0,
   };
 
-  enc->draw(forward_root_data.gpu, 3, 1, 0, 0);
+  enc->draw_indexed(forward_root_data.gpu, model_res.indices.size(), index_buf_);
 
   enc->end_rendering();
 
   device_->end_cmd_encoder(enc);
-  device_->submit_queue();
+
+  rhi::CmdEncoder* cmds[] = {enc};
+  device_->submit(cmds);
 
   frame_num_++;
 }

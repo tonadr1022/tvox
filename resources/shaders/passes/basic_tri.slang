@@ -11,7 +11,7 @@ struct VOut {
 VOut vs_main(uint vert_idx: SV_VertexID) {
   VOut output;
   Vertex vertex = g_root.vertices[vert_idx];
-  output.position = float4(vertex.position, 1.0);
+  output.position = mul(g_root.view_proj, float4(vertex.position, 1.0));
   output.color = g_root.output_result[0];
 
   return output;

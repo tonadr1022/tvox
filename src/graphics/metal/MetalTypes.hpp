@@ -2,6 +2,8 @@
 
 // clang-format off
 #include "graphics/rhi/Graphics.hpp"
+#include <Metal/MTL4CommandAllocator.hpp>
+#include <deque>
 #include <type_traits> // IWYU pragma: keep
 #include <Foundation/NSSharedPtr.hpp>
 // clang-format on
@@ -16,6 +18,10 @@ namespace CA {
 class MetalLayer;
 }
 
+namespace gfx::metal {
+
+class MetalCmdEncoder;
+// TODO: why is this not in a namespace
 struct Swapchain_Metal {
   NS::SharedPtr<CA::MetalLayer> layer;
   NS::SharedPtr<MTL::Texture> curr_texture;
@@ -40,14 +46,14 @@ struct Buffer_Metal {
   NS::SharedPtr<MTL::Buffer> buffer;
 };
 
+struct CmdPool_Metal {
+  std::deque<std::unique_ptr<MetalCmdEncoder>> encoders;
+  std::deque<std::unique_ptr<MetalCmdEncoder>> free_encoders;
+  NS::SharedPtr<MTL4::CommandAllocator> cmd_allocator;
+};
+
 template <typename T>
 struct MetalType;
-
-namespace gfx::rhi {
-struct Swapchain;
-struct Shader;
-struct Pipeline;
-} // namespace gfx::rhi
 
 #define MAKE_METAL_TYPE(name)                                                                      \
   template <>                                                                                      \
@@ -60,16 +66,19 @@ MAKE_METAL_TYPE(Shader)
 MAKE_METAL_TYPE(Pipeline)
 MAKE_METAL_TYPE(GpuHeap)
 MAKE_METAL_TYPE(Buffer)
+MAKE_METAL_TYPE(CmdPool)
 
 #undef MAKE_METAL_TYPE
 
 template <typename T>
-typename MetalType<T>::type* to_internal(const T& param) {
-  return static_cast<typename MetalType<T>::type*>(param.internal_data.get());
+MetalType<T>::type* to_internal(const T& param) {
+  return static_cast<MetalType<T>::type*>(param.internal_data.get());
 }
 
 template <typename T>
-typename MetalType<T>::type* to_internal(const T* param) {
+MetalType<T>::type* to_internal(const T* param) {
   ASSERT(param);
-  return static_cast<typename MetalType<T>::type*>(param->internal_data.get());
+  return static_cast<MetalType<T>::type*>(param->internal_data.get());
 }
+
+} // namespace gfx::metal

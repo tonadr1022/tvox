@@ -2,7 +2,6 @@
 
 // clang-format off
 #include <Metal/MTLResidencySet.hpp>
-#include <type_traits> // IWYU pragma: keep
 #include <Foundation/NSSharedPtr.hpp>
 // clang-format on
 
@@ -13,7 +12,6 @@
 #include "small_vector/small_vector.hpp"
 
 #include <Metal/Metal.hpp>
-#include <optional>
 #include <string_view>
 #include <unordered_map>
 
@@ -38,15 +36,17 @@ public:
   bool create_shader(rhi::ShaderType type, const void* data, size_t size, rhi::Shader& shader,
                      std::string_view entry_point) override;
   bool create_buffer(const rhi::BufferDesc& desc, rhi::Buffer& buffer) override;
+  bool create_cmd_pool(rhi::CmdPool& pool) override;
+  void reset_cmd_pool(rhi::CmdPool& pool) override;
 
-  rhi::CmdEncoder* begin_cmd_encoder() override;
+  rhi::CmdEncoder* begin_cmd_encoder(rhi::CmdPool& pool) override;
   void end_cmd_encoder(rhi::CmdEncoder* encoder) override;
 
   MTL::Device* get_device() const {
     return device_.get();
   }
 
-  void submit_queue() override;
+  void submit(std::span<rhi::CmdEncoder*> cmds) override;
 
   MTL::RenderPipelineState*
   get_or_create_render_pipeline(rhi::Pipeline& pipeline,
@@ -67,18 +67,16 @@ private:
       pipelines_cache_;
 
   struct PerFrame {
-    NS::SharedPtr<MTL4::CommandAllocator> cmd_allocator;
-    NS::SharedPtr<MTL4::CommandBuffer> cmd_buf;
-    std::optional<MetalCmdEncoder> cmd_encoder;
-    size_t cmd_buffers_allocated{};
     NS::SharedPtr<MTL::SharedEvent> fence;
     size_t fence_value{};
   };
 
+  // TODO: idt the device should have a notion of "current frame"
   [[nodiscard]]
   size_t curr_frame_in_flight() const {
     return frame_num_ % frames_in_flight_;
   }
+
   PerFrame& curr_frame() {
     return per_frame_[curr_frame_in_flight()];
   }
@@ -87,7 +85,7 @@ private:
 
   NS::SharedPtr<MTL::ResidencySet> main_residency_set_;
 
-  size_t frames_in_flight_{3};
+  size_t frames_in_flight_{rhi::k_max_frames_in_flight};
   size_t frame_num_{};
 };
 

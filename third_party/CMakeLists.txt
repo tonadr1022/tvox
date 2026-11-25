@@ -2,6 +2,9 @@ add_subdirectory(SDL)
 add_subdirectory(metal-cpp)
 add_subdirectory(glm)
 
+add_library(cgltf INTERFACE)
+target_include_directories(cgltf INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/cgltf)
+
 set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
 set(JSON_Install OFF CACHE BOOL "" FORCE)
 add_subdirectory(json)

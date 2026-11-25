@@ -47,10 +47,6 @@ void MetalDevice::init() {
 
   for (int i = 0; i < frames_in_flight_; i++) {
     auto& frame = per_frame_[i];
-    frame.cmd_allocator = NS::TransferPtr(device_->newCommandAllocator());
-    frame.cmd_buf = NS::TransferPtr(device_->newCommandBuffer());
-    frame.cmd_encoder.emplace();
-    frame.cmd_encoder->init(this, frame.cmd_buf);
     frame.fence = NS::TransferPtr(device_->newSharedEvent());
   }
 
@@ -271,39 +267,73 @@ MetalDevice::get_or_create_render_pipeline(rhi::Pipeline& pipeline,
   return it->second.get();
 }
 
-rhi::CmdEncoder* MetalDevice::begin_cmd_encoder() {
-  auto& frame = curr_frame();
-  frame.cmd_allocator->reset();
-  frame.cmd_buf->beginCommandBuffer(frame.cmd_allocator.get());
-  frame.cmd_buffers_allocated++;
-  return &frame.cmd_encoder.value();
+rhi::CmdEncoder* MetalDevice::begin_cmd_encoder(rhi::CmdPool& pool) {
+  auto* internal_data = to_internal(pool);
+  // device_->newCOmmandBuffer();
+  // auto& buffer = pool
+
+  MetalCmdEncoder* enc{};
+  if (!internal_data->free_encoders.empty()) {
+    auto encoder = std::move(internal_data->free_encoders.front());
+    internal_data->free_encoders.pop_front();
+    enc = internal_data->encoders.emplace_back(std::move(encoder)).get();
+  }
+  {
+    enc = internal_data->encoders.emplace_back(std::make_unique<MetalCmdEncoder>()).get();
+    enc->device_ = this;
+    enc->cmd_buf_ = NS::TransferPtr(device_->newCommandBuffer());
+
+    // TODO: should this be per-command buffer, what are the tradeoffs, what are apple docs
+    enc->cmd_allocator_ = internal_data->cmd_allocator;
+
+    auto arg_table_desc = NS::TransferPtr(MTL4::ArgumentTableDescriptor::alloc()->init());
+    arg_table_desc->setInitializeBindings(true);
+    arg_table_desc->setLabel(NS::String::string("arg_table", NS::UTF8StringEncoding));
+    arg_table_desc->setMaxBufferBindCount(1);
+    NS::Error* error{};
+    enc->arg_table_ = NS::TransferPtr(device_->newArgumentTable(arg_table_desc.get(), &error));
+    ASSERT(!error);
+  }
+
+  ASSERT(enc->cmd_buf_);
+  ASSERT(enc->cmd_allocator_);
+  enc->cmd_buf_->beginCommandBuffer(enc->cmd_allocator_.get());
+  return enc;
 }
 
 void MetalDevice::end_cmd_encoder([[maybe_unused]] rhi::CmdEncoder* encoder) {
-  curr_frame().cmd_buf->endCommandBuffer();
+  auto* mtl_enc = reinterpret_cast<MetalCmdEncoder*>(encoder);
+  mtl_enc->end_compute();
+  mtl_enc->cmd_buf_->endCommandBuffer();
 }
 
-void MetalDevice::submit_queue() {
+void MetalDevice::submit(std::span<rhi::CmdEncoder*> cmds) {
   auto& frame = curr_frame();
 
-  ASSERT(frame.cmd_buffers_allocated == 1);
-  frame.cmd_buffers_allocated = 0;
+  std::vector<MTL4::CommandBuffer*> submit_cmd_buffers;
+  submit_cmd_buffers.reserve(cmds.size());
+  for (auto* enc : cmds) {
+    auto* mtl_enc = reinterpret_cast<MetalCmdEncoder*>(enc);
+    submit_cmd_buffers.emplace_back(mtl_enc->cmd_buf_.get());
 
-  MTL4::CommandBuffer* submit_cmd_buffers[] = {
-      frame.cmd_buf.get(),
-  };
-
-  for (auto& drawable : frame.cmd_encoder->presents_) {
-    queue_->wait(drawable.get());
+    for (auto& drawable : mtl_enc->presents_) {
+      queue_->wait(drawable.get());
+    }
   }
 
-  queue_->commit(submit_cmd_buffers, ARRAY_SIZE(submit_cmd_buffers));
+  queue_->commit(submit_cmd_buffers.data(), submit_cmd_buffers.size());
 
-  for (auto& drawable : frame.cmd_encoder->presents_) {
-    queue_->signalDrawable(drawable.get());
-    drawable->present();
+  for (auto* enc : cmds) {
+    auto* mtl_enc = reinterpret_cast<MetalCmdEncoder*>(enc);
+
+    for (auto& drawable : mtl_enc->presents_) {
+      queue_->signalDrawable(drawable.get());
+      drawable->present();
+    }
+    mtl_enc->presents_.clear();
   }
-  frame.cmd_encoder->presents_.clear();
+
+  // TODO: should we just expose fences to the renderer? think about this
 
   // signal fence for the frame after work is complete
   frame.fence_value++;
@@ -354,6 +384,23 @@ bool MetalDevice::create_buffer(const rhi::BufferDesc& desc, rhi::Buffer& buffer
   buffer.gpu_ptr = reinterpret_cast<void*>(mtl_buffer->gpuAddress());
 
   return true;
+}
+
+bool MetalDevice::create_cmd_pool(rhi::CmdPool& pool) {
+  pool.internal_data.reset();
+  pool.internal_data = wi::allocator::make_shared<CmdPool_Metal>();
+  auto* internal_data = to_internal(pool);
+  internal_data->cmd_allocator = NS::TransferPtr(device_->newCommandAllocator());
+  return true;
+}
+
+void MetalDevice::reset_cmd_pool(rhi::CmdPool& pool) {
+  auto* internal_data = to_internal(pool);
+  for (auto& enc : internal_data->encoders) {
+    // TODO: do some assertions here
+    internal_data->free_encoders.push_back(std::move(enc));
+  }
+  internal_data->encoders.clear();
 }
 
 } // namespace gfx::metal

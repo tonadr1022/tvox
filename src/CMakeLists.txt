@@ -22,6 +22,7 @@ add_executable(${target_name}
   App.cpp
   platform/Window.cpp
   graphics/Renderer.cpp
+  graphics/ModelLoad.cpp
   graphics/rhi/Device.cpp
 )
 
@@ -42,7 +43,9 @@ target_link_libraries(${target_name} PRIVATE
   METAL_CPP
   SDL3::SDL3
   glm::glm
+  # TODO: do we really need this
   tvox_shader_compiler
+  cgltf
 )
 
 target_include_directories(${target_name} PRIVATE

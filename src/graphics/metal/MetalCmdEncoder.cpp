@@ -18,19 +18,7 @@
 
 namespace gfx::metal {
 
-void MetalCmdEncoder::init(MetalDevice* device, const NS::SharedPtr<MTL4::CommandBuffer>& cmd_buf) {
-  device_ = device;
-  cmd_buf_ = cmd_buf;
-
-  auto arg_table_desc = NS::TransferPtr(MTL4::ArgumentTableDescriptor::alloc()->init());
-  arg_table_desc->setInitializeBindings(true);
-  arg_table_desc->setLabel(NS::String::string("arg_table", NS::UTF8StringEncoding));
-  arg_table_desc->setMaxBufferBindCount(1);
-  NS::Error* error{};
-  arg_table_ =
-      NS::TransferPtr(device_->get_device()->newArgumentTable(arg_table_desc.get(), &error));
-  ASSERT(!error);
-}
+MetalCmdEncoder::~MetalCmdEncoder() = default;
 
 void MetalCmdEncoder::begin_rendering(rhi::Swapchain& swapchain) {
   end_compute();
@@ -98,6 +86,14 @@ void MetalCmdEncoder::draw(const void* root, uint32_t vertex_count, uint32_t ins
   ASSERT(curr_render_encoder_);
   curr_render_encoder_->drawPrimitives(MTL::PrimitiveType::PrimitiveTypeTriangle, first_vertex,
                                        vertex_count, instance_count, first_instance);
+}
+void MetalCmdEncoder::draw_indexed(const void* root, uint32_t index_count,
+                                   rhi::Buffer& index_buffer) {
+  set_root(root);
+  ASSERT(curr_render_encoder_);
+  curr_render_encoder_->drawIndexedPrimitives(
+      MTL::PrimitiveTypeTriangle, index_count, MTL::IndexTypeUInt32,
+      reinterpret_cast<MTL::GPUAddress>(index_buffer.gpu_ptr), index_buffer.desc.size);
 }
 
 void MetalCmdEncoder::dispatch(const void* root, uint32_t thread_groups_x, uint32_t thread_groups_y,
