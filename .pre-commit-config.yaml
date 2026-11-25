@@ -1,0 +1,23 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+
+  - repo: local
+    hooks:
+      - id: clang-format
+        name: clang-format
+        entry: ./scripts/format.sh
+        language: system
+        files: ^src/.*\.(c|cc|cpp|cxx|h|hh|hpp|hxx|m|mm)$
+        require_serial: true
+      - id: clang-tidy
+        name: clang-tidy style checks
+        entry: ./scripts/tidy.sh
+        language: system
+        files: ^src/.*\.(c|cc|cpp|cxx|h|hh|hpp|hxx|m|mm)$
+        require_serial: true

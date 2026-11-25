@@ -29,9 +29,10 @@ App::App() : window_(create_window()) {
   });
 }
 
-void App::run() {
+void App::run(std::optional<uint64_t> max_frames) {
   bool shutdown_requested{};
-  while (!shutdown_requested) {
+  uint64_t rendered_frames{};
+  while (!shutdown_requested && (!max_frames || rendered_frames < *max_frames)) {
     SDL_Event event{};
     while (SDL_PollEvent(&event)) {
       switch (event.type) {
@@ -46,6 +47,7 @@ void App::run() {
     }
 
     renderer_.render();
+    ++rendered_frames;
   }
 
   shutdown();

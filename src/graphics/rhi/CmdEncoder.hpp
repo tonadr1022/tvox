@@ -21,6 +21,6 @@ public:
   virtual void copy_buffer_to_buffer(rhi::Buffer& dst, size_t dst_offset, rhi::Buffer& src,
                                      size_t src_offset, size_t size) = 0;
 
-  virtual void barrier() = 0;
+  virtual void barrier(Stage before, Access before_access, Stage after, Access after_access) = 0;
 };
 } // namespace gfx::rhi

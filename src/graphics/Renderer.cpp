@@ -159,7 +159,8 @@ void Renderer::render() {
   };
 
   enc->dispatch(compute_root_data.gpu, 1, 1, 1);
-  enc->barrier();
+  enc->barrier(rhi::Stage::Compute, rhi::Access::ShaderWrite, rhi::Stage::Vertex,
+               rhi::Access::ShaderRead);
 
   {
     auto depth_att = RenderAttInfo::depth_stencil_att({.tex = &depth_att_tex_}, LoadOp::DontCare);
@@ -178,6 +179,9 @@ void Renderer::render() {
     };
     enc->draw_indexed(forward_root_data.gpu, model_res.indices.size(), index_buf_);
     enc->end_rendering();
+    enc->barrier(rhi::Stage::ColorOutput | rhi::Stage::DepthStencilTests,
+                 rhi::Access::ColorWrite | rhi::Access::DepthStencilWrite, rhi::Stage::Fragment,
+                 rhi::Access::ShaderRead);
   }
 
   {
@@ -190,7 +194,6 @@ void Renderer::render() {
         .tex = color_att_tex_.index,
     };
     enc->draw(post_process_root.gpu, 3, 1, 0, 0);
-
     enc->end_rendering();
   }
 
@@ -236,14 +239,14 @@ void Renderer::recreate_textures() {
                                      .width = static_cast<uint32_t>(w),
                                      .height = static_cast<uint32_t>(h),
                                      .depth = 1,
-                                     .format = rhi::Format::RGBA32_FLOAT,
+                                     .format = rhi::Format::Rgba32Float,
                                      .usage = TextureUsage::RenderTarget,
                                  });
   create_texture(depth_att_tex_, {
                                      .width = static_cast<uint32_t>(w),
                                      .height = static_cast<uint32_t>(h),
                                      .depth = 1,
-                                     .format = rhi::Format::D32_FLOAT,
+                                     .format = rhi::Format::D32Float,
                                      .usage = TextureUsage::RenderTarget,
                                  });
 }

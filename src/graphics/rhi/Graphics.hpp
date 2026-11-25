@@ -11,13 +11,77 @@ struct SDL_Window;
 
 namespace gfx::rhi {
 
+enum class Stage : uint64_t {
+  None = 0,
+  Indirect = 1ull << 0u,
+  IndexInput = 1ull << 1u,
+  Vertex = 1ull << 2u,
+  Task = 1ull << 3u,
+  Mesh = 1ull << 4u,
+  DepthStencilTests = 1ull << 5u,
+  Fragment = 1ull << 6u,
+  ColorOutput = 1ull << 7u,
+  Compute = 1ull << 8u,
+  Transfer = 1ull << 9u,
+  Host = 1ull << 10u,        // Barrier destination only, paired with HostRead.
+  AllCommands = 1ull << 11u, // All GPU command stages; excludes host.
+};
+
+constexpr Stage operator|(Stage lhs, Stage rhs) noexcept {
+  return static_cast<Stage>(static_cast<uint64_t>(lhs) | static_cast<uint64_t>(rhs));
+}
+
+struct StageMask {
+  Stage value;
+
+  constexpr explicit operator bool() const noexcept {
+    return static_cast<uint64_t>(value) != 0;
+  }
+};
+
+constexpr StageMask operator&(Stage lhs, Stage rhs) noexcept {
+  return {static_cast<Stage>(static_cast<uint64_t>(lhs) & static_cast<uint64_t>(rhs))};
+}
+
+enum class Access : uint64_t {
+  None = 0,
+  TransferRead = 1ull << 0u,
+  TransferWrite = 1ull << 1u,
+  ShaderRead = 1ull << 2u,
+  ShaderWrite = 1ull << 3u,
+  ColorRead = 1ull << 4u,
+  ColorWrite = 1ull << 5u,
+  DepthStencilRead = 1ull << 6u,
+  DepthStencilWrite = 1ull << 7u,
+  IndirectRead = 1ull << 8u,
+  IndexRead = 1ull << 9u,
+  HostRead = 1ull << 10u,
+  DescriptorRead = 1ull << 11u,
+};
+
+constexpr Access operator|(Access lhs, Access rhs) noexcept {
+  return static_cast<Access>(static_cast<uint64_t>(lhs) | static_cast<uint64_t>(rhs));
+}
+
+struct AccessMask {
+  Access value;
+
+  constexpr explicit operator bool() const noexcept {
+    return static_cast<uint64_t>(value) != 0;
+  }
+};
+
+constexpr AccessMask operator&(Access lhs, Access rhs) noexcept {
+  return {static_cast<Access>(static_cast<uint64_t>(lhs) & static_cast<uint64_t>(rhs))};
+}
+
 constexpr size_t k_max_frames_in_flight = 2;
 
 enum class Format : uint8_t {
   Unknown = 0,
-  BGRA8_UNORM,
-  RGBA32_FLOAT,
-  D32_FLOAT,
+  Bgra8Unorm,
+  Rgba32Float,
+  D32Float,
 };
 
 enum class TextureType : uint8_t {
@@ -28,7 +92,7 @@ enum class TextureType : uint8_t {
 
 struct SwapchainDesc {
   uint32_t width, height;
-  Format format{Format::BGRA8_UNORM};
+  Format format{Format::Bgra8Unorm};
 };
 
 struct Swapchain {

@@ -56,7 +56,7 @@ struct Texture_Metal {
   NS::SharedPtr<MTL::Texture> texture;
 };
 
-struct TextureView_Metal {
+struct TextureViewMetal {
   NS::SharedPtr<MTL::Texture> view_texture;
 };
 

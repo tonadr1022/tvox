@@ -33,7 +33,8 @@ public:
   void draw_indexed(const void* root, uint32_t index_count, rhi::Buffer& index_buffer) override;
   void dispatch(const void* root, uint32_t thread_groups_x, uint32_t thread_groups_y,
                 uint32_t thread_groups_z) override;
-  void barrier() override;
+  void barrier(rhi::Stage before, rhi::Access before_access, rhi::Stage after,
+               rhi::Access after_access) override;
   void copy_buffer_to_buffer(rhi::Buffer& dst, size_t dst_offset, rhi::Buffer& src,
                              size_t src_offset, size_t size) override;
 
@@ -48,11 +49,22 @@ public:
   MetalDevice* device_{};
   rhi::RenderPassInfo renderpass_info_{};
 
+  struct PendingBarrier {
+    rhi::Stage before;
+    rhi::Access before_access;
+    rhi::Stage after;
+    rhi::Access after_access;
+  };
+  gch::small_vector<PendingBarrier, 8> pending_barriers_;
+
   void end_compute();
 
 private:
+  friend class MetalDevice;
+
   void set_root(const void* root) const;
   void start_compute();
+  void flush_pending_barriers();
 };
 
 } // namespace gfx::metal

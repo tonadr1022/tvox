@@ -24,11 +24,11 @@ namespace {
 
 MTL::PixelFormat to_metal_format(rhi::Format format) {
   switch (format) {
-  case rhi::Format::BGRA8_UNORM:
+  case rhi::Format::Bgra8Unorm:
     return MTL::PixelFormatBGRA8Unorm;
-  case rhi::Format::D32_FLOAT:
+  case rhi::Format::D32Float:
     return MTL::PixelFormatDepth32Float;
-  case rhi::Format::RGBA32_FLOAT:
+  case rhi::Format::Rgba32Float:
     return MTL::PixelFormatRGBA32Float;
   case rhi::Format::Unknown:
     return MTL::PixelFormatInvalid;
@@ -109,7 +109,7 @@ void MetalDevice::init() {
 void MetalDevice::create_swapchain(const rhi::SwapchainDesc& desc, SDL_Window* window,
                                    rhi::Swapchain& swapchain) {
   swapchain.desc = desc;
-  swapchain.desc.format = rhi::Format::BGRA8_UNORM;
+  swapchain.desc.format = rhi::Format::Bgra8Unorm;
 
   if (!swapchain.internal_data) {
     swapchain.internal_data = wi::allocator::make_shared<Swapchain_Metal>();
@@ -372,6 +372,7 @@ rhi::CmdEncoder* MetalDevice::begin_cmd_encoder(rhi::CmdPool& pool) {
     ASSERT(!error);
   }
 
+  enc->pending_barriers_.clear();
   ASSERT(enc->cmd_buf_);
   ASSERT(enc->cmd_allocator_);
   enc->cmd_buf_->beginCommandBuffer(enc->cmd_allocator_.get());
@@ -381,6 +382,7 @@ rhi::CmdEncoder* MetalDevice::begin_cmd_encoder(rhi::CmdPool& pool) {
 void MetalDevice::end_cmd_encoder([[maybe_unused]] rhi::CmdEncoder* encoder) {
   auto* mtl_enc = reinterpret_cast<MetalCmdEncoder*>(encoder);
   mtl_enc->end_compute();
+  mtl_enc->pending_barriers_.clear();
   mtl_enc->cmd_buf_->endCommandBuffer();
 }
 
