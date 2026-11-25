@@ -6,6 +6,6 @@ struct BasicRoot {
   float padding0;
 };
 
-#if !defined(__SLANG__)
+#ifndef __SLANG__
 static_assert(sizeof(BasicRoot) == 16);
 #endif

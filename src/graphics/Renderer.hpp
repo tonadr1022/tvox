@@ -28,6 +28,7 @@ public:
 
 private:
   void reload_shaders();
+  void recreate_textures();
   /// Load a cooked metallib by logical technique id + stage (entry from registry).
   void load_shader(rhi::Shader& shader, std::string_view technique, rhi::ShaderType stage);
 
@@ -39,6 +40,8 @@ private:
   rhi::Shader basic_vs_;
   rhi::Shader basic_fs_;
   rhi::Shader basic_cs_;
+  rhi::Shader post_process_vs_;
+  rhi::Shader post_process_fs_;
   rhi::Pipeline basic_;
   rhi::Pipeline post_process_;
   rhi::Pipeline basic_comp_pso_;

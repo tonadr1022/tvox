@@ -1,3 +1,4 @@
+#include "shader.slang"
 #include "forward_pass_shared.h"
 
 GPU_ROOT(ForwardRoot, g_root)

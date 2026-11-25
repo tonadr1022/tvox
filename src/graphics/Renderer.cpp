@@ -12,6 +12,7 @@
 #include "graphics/rhi/Graphics.hpp"
 #include "graphics/rhi/ShaderType.hpp"
 #include "graphics/shaders/TechniqueRegistry.hpp"
+#include "post_process_shared.h"
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
@@ -57,6 +58,7 @@ void Renderer::init(const InitInfo& info) {
     device_->create_swapchain(
         {.width = static_cast<uint32_t>(w), .height = static_cast<uint32_t>(h)}, window_,
         swapchain_);
+    recreate_textures();
   }
 
   FATAL_IF(info.shader_root.empty(), "shader_root is empty");
@@ -134,18 +136,7 @@ void Renderer::render() {
               .height = static_cast<uint32_t>(h),
           },
           window_, swapchain_);
-      device_->create_texture(color_att_tex_, {
-                                                  .width = static_cast<uint32_t>(w),
-                                                  .height = static_cast<uint32_t>(h),
-                                                  .depth = 1,
-                                                  .format = rhi::Format::RGBA32_FLOAT,
-                                              });
-      device_->create_texture(depth_att_tex_, {
-                                                  .width = static_cast<uint32_t>(w),
-                                                  .height = static_cast<uint32_t>(h),
-                                                  .depth = 1,
-                                                  .format = rhi::Format::D32_FLOAT,
-                                              });
+      recreate_textures();
     }
   }
   float aspect = static_cast<float>(w) / static_cast<float>(h);
@@ -173,12 +164,10 @@ void Renderer::render() {
   enc->barrier();
 
   {
-    auto depth_att = RenderAttInfo::depth_stencil_att(depth_att_tex_.default_view);
+    auto depth_att = RenderAttInfo::depth_stencil_att({.tex = &depth_att_tex_}, LoadOp::DontCare);
     RenderAttInfo color_atts[] = {
-        RenderAttInfo::color_att(color_att_tex_.default_view, LoadOp::DontCare,
-                                 {
-                                     .color = glm::vec4{1, 0.5, 0.5, 1},
-                                 }),
+        RenderAttInfo::color_att({.tex = &color_att_tex_}, LoadOp::DontCare,
+                                 {.color = glm::vec4{1, 0.5, 0.5, 1}}),
     };
     enc->begin_rendering(w, h, color_atts, &depth_att);
     enc->bind_pipeline(basic_);
@@ -195,7 +184,13 @@ void Renderer::render() {
 
   {
     enc->begin_rendering(swapchain_);
-    // TODO: do we reallly want to do a full screen pass that just writes to the swapchain
+    enc->bind_pipeline(post_process_);
+
+    auto post_process_root = frame_allocator->allocate<PostProcessRoot>(1);
+    *post_process_root.cpu = PostProcessRoot{
+        .mult = std::sin(SDL_GetTicksNS() / 1000.f / 1000.f / 1000.f * 10),
+    };
+    enc->draw(post_process_root.gpu, 3, 1, 0, 0);
 
     enc->end_rendering();
   }
@@ -219,9 +214,34 @@ void Renderer::reload_shaders() {
   load_shader(basic_vs_, "basic_tri", ShaderType::Vertex);
   load_shader(basic_fs_, "basic_tri", ShaderType::Fragment);
   load_shader(basic_cs_, "basic", ShaderType::Compute);
+  load_shader(post_process_vs_, "post_process", ShaderType::Vertex);
+  load_shader(post_process_fs_, "post_process", ShaderType::Fragment);
 
   device_->create_pipeline({.vertex_shader = &basic_vs_, .fragment_shader = &basic_fs_}, basic_);
   device_->create_pipeline(basic_cs_, basic_comp_pso_);
+  device_->create_pipeline(
+      {.vertex_shader = &post_process_vs_, .fragment_shader = &post_process_fs_}, post_process_);
+}
+
+void Renderer::recreate_textures() {
+  int w{}, h{};
+  SDL_GetWindowSize(window_, &w, &h);
+  device_->create_texture(color_att_tex_, {
+                                              .width = static_cast<uint32_t>(w),
+                                              .height = static_cast<uint32_t>(h),
+                                              .depth = 1,
+                                              .format = rhi::Format::RGBA32_FLOAT,
+                                              .usage = TextureUsage::RenderTarget,
+                                          });
+  device_->create_texture(depth_att_tex_, {
+                                              .width = static_cast<uint32_t>(w),
+                                              .height = static_cast<uint32_t>(h),
+                                              .depth = 1,
+                                              .format = rhi::Format::D32_FLOAT,
+                                              .usage = TextureUsage::RenderTarget,
+                                          });
+
+  device_->write_texture_desc({.texture_type = TextureType::D2}, color_att_tex_, 0);
 }
 
 void Renderer::load_shader(Shader& shader, std::string_view technique, ShaderType stage) {

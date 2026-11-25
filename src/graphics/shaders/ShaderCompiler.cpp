@@ -70,14 +70,20 @@ void ShaderCompiler::init_if_needed() {
   const CompilerOptionEntry compiler_options[] = {
       CompilerOptionEntry{
           .name = CompilerOptionName::DebugInformation,
-          .value = {.kind = CompilerOptionValueKind::Int,
-                    .intValue0 = SLANG_DEBUG_INFO_LEVEL_MINIMAL},
+          .value =
+              {
+                  .kind = CompilerOptionValueKind::Int,
+                  .intValue0 = SLANG_DEBUG_INFO_LEVEL_MINIMAL,
+              },
       },
       CompilerOptionEntry{
           .name = CompilerOptionName::DownstreamArgs,
-          .value = {.kind = CompilerOptionValueKind::String,
-                    .stringValue0 = "metal",
-                    .stringValue1 = "-frecord-sources\n-gline-tables-only"},
+          .value =
+              {
+                  .kind = CompilerOptionValueKind::String,
+                  .stringValue0 = "metal",
+                  .stringValue1 = "-frecord-sources\n-gline-tables-only",
+              },
       },
   };
 

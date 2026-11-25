@@ -1,5 +1,5 @@
+#include "shader.slang"
 #include "basic_shared.h"
-#include "shader_defines.h"
 
 GPU_ROOT(BasicRoot, g_root)
 

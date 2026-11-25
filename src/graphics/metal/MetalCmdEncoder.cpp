@@ -92,9 +92,9 @@ void MetalCmdEncoder::begin_rendering(uint32_t width, uint32_t height,
 
   for (size_t color_desc_i = 0; color_desc_i < color_atts.size(); color_desc_i++) {
     auto& color_att = color_atts[color_desc_i];
-    auto* tex_view_internal_data = to_internal(color_att.tex_view);
+    auto* tex_internal_data = to_internal(color_att.render_view.tex);
     auto color_desc = NS::TransferPtr(MTL::RenderPassColorAttachmentDescriptor::alloc()->init());
-    color_desc->setTexture(tex_view_internal_data->view_texture.get());
+    color_desc->setTexture(tex_internal_data->texture.get());
     color_desc->setClearColor(
         MTL::ClearColor::Make(color_att.clear.color.x, color_att.clear.color.y,
                               color_att.clear.color.z, color_att.clear.color.w));
@@ -107,14 +107,14 @@ void MetalCmdEncoder::begin_rendering(uint32_t width, uint32_t height,
   }
 
   if (depth_att) {
-    auto* tex_view_internal_data = to_internal(depth_att->tex_view);
+    auto* tex_view_internal_data = to_internal(depth_att->render_view.tex);
     auto depth_att_desc =
         NS::TransferPtr(MTL::RenderPassDepthAttachmentDescriptor::alloc()->init());
     depth_att_desc->setLevel(0);
     depth_att_desc->setSlice(0);
     depth_att_desc->setLoadAction(to_metal(depth_att->load_op));
     depth_att_desc->setStoreAction(to_metal(depth_att->store_op));
-    depth_att_desc->setTexture(tex_view_internal_data->view_texture.get());
+    depth_att_desc->setTexture(tex_view_internal_data->texture.get());
     depth_att_desc->setClearDepth(depth_att->clear.depth_stencil.depth);
     render_pass_desc->setDepthAttachment(depth_att_desc.get());
   }

@@ -20,6 +20,12 @@ enum class Format : uint8_t {
   D32_FLOAT,
 };
 
+enum class TextureType : uint8_t {
+  D1,
+  D2,
+  D3,
+};
+
 struct SwapchainDesc {
   uint32_t width, height;
   Format format{Format::BGRA8_UNORM};
@@ -30,26 +36,70 @@ struct Swapchain {
   SwapchainDesc desc;
 };
 
+enum class TextureUsage : uint32_t {
+  None = 0,
+  RenderTarget = 1 << 0,
+  ShaderRead = 1 << 1,
+  ShaderWrite = 1 << 2,
+};
+
+struct TextureUsageMask {
+  TextureUsage value;
+
+  constexpr explicit operator bool() const noexcept {
+    return static_cast<std::underlying_type_t<TextureUsage>>(value) != 0;
+  }
+};
+
+constexpr TextureUsage operator|(TextureUsage lhs, TextureUsage rhs) noexcept {
+  using Underlying = std::underlying_type_t<TextureUsage>;
+  return static_cast<TextureUsage>(static_cast<Underlying>(lhs) | static_cast<Underlying>(rhs));
+}
+
+constexpr TextureUsage& operator|=(TextureUsage& lhs, TextureUsage rhs) noexcept {
+  lhs = lhs | rhs;
+  return lhs;
+}
+
+constexpr TextureUsageMask operator&(TextureUsage lhs, TextureUsage rhs) noexcept {
+  using Underlying = std::underlying_type_t<TextureUsage>;
+  return TextureUsageMask{
+      static_cast<TextureUsage>(static_cast<Underlying>(lhs) & static_cast<Underlying>(rhs)),
+  };
+}
+
 struct TextureDesc {
   uint32_t width{}, height{}, depth{};
   uint32_t array_length{1};
   uint32_t mip_count{1};
   Format format{};
-};
-
-struct TextureViewDesc {
-  Format format{};
-};
-
-struct TextureView {
-  wi::allocator::shared_ptr<void> internal_data;
-  TextureViewDesc desc{};
+  TextureUsage usage{TextureUsage::None};
+  TextureType type{TextureType::D2};
 };
 
 struct Texture {
   wi::allocator::shared_ptr<void> internal_data;
   TextureDesc desc{};
-  TextureView default_view{};
+};
+
+struct RenderViewDesc {
+  rhi::Texture& texture;
+  uint32_t mip{};
+  uint32_t slice{};
+};
+
+struct TextureDescriptorDesc {
+  uint32_t slice{};
+  uint32_t array_length{}; // 0 => remaining layers
+  uint32_t mip{};
+  uint32_t mip_count{}; // 0 => remaining mips
+  TextureType texture_type{TextureType::D2};
+};
+
+struct RenderView {
+  rhi::Texture* tex{};
+  uint32_t slice{};
+  uint32_t mip{};
 };
 
 struct ShaderDesc {
@@ -169,16 +219,16 @@ union ClearValue {
 struct RenderAttInfo {
   enum class Type : uint8_t { Color, DepthStencil };
 
-  TextureView& tex_view;
+  RenderView render_view{};
   Type type{Type::Color};
   LoadOp load_op{LoadOp::Load};
   StoreOp store_op{StoreOp::Store};
   ClearValue clear{};
 
-  static RenderAttInfo color_att(TextureView& tex_view, LoadOp load_op = LoadOp::Load,
+  static RenderAttInfo color_att(RenderView render_view, LoadOp load_op = LoadOp::Load,
                                  ClearValue clear_value = {}, StoreOp store_op = StoreOp::Store) {
     return {
-        .tex_view = tex_view,
+        .render_view = render_view,
         .type = Type::Color,
         .load_op = load_op,
         .store_op = store_op,
@@ -186,11 +236,11 @@ struct RenderAttInfo {
     };
   }
 
-  static RenderAttInfo depth_stencil_att(TextureView& tex_view, LoadOp load_op = LoadOp::Load,
+  static RenderAttInfo depth_stencil_att(RenderView render_view, LoadOp load_op = LoadOp::Load,
                                          ClearValue clear_value = {},
                                          StoreOp store_op = StoreOp::Store) {
     return {
-        .tex_view = tex_view,
+        .render_view = render_view,
         .type = Type::DepthStencil,
         .load_op = load_op,
         .store_op = store_op,
@@ -249,6 +299,7 @@ enum class BorderColor : uint8_t {
   IntOpaqueWhite,
 };
 
+// TODO: make this backend specific. rhi doesn't need to know about this
 struct RenderPassInfo {
   static constexpr uint32_t k_max_rt = 8;
 
@@ -300,11 +351,12 @@ struct RenderPassInfo {
     info.rt_count = color_atts.size();
     for (size_t i = 0; i < color_atts.size(); i++) {
       auto& color_att = color_atts[i];
-      info.rt_formats[i] = color_att.tex_view.desc.format;
+      // TODO: get the format of the real texture
+      info.rt_formats[i] = color_att.render_view.tex->desc.format;
       ASSERT(info.rt_formats[i] != Format::Unknown);
     }
     if (depth_att) {
-      info.ds_format = depth_att->tex_view.desc.format;
+      info.ds_format = depth_att->render_view.tex->desc.format;
     }
     info.sample_count = 1;
     return info;

@@ -36,6 +36,32 @@ MTL::PixelFormat to_metal_format(rhi::Format format) {
   return MTL::PixelFormatInvalid;
 }
 
+MTL::TextureType to_metal(rhi::TextureType type) {
+  switch (type) {
+  case rhi::TextureType::D1:
+    return MTL::TextureType1D;
+  case rhi::TextureType::D2:
+    return MTL::TextureType2D;
+  case rhi::TextureType::D3:
+    return MTL::TextureType3D;
+    break;
+  }
+}
+
+MTL::TextureUsage to_metal(rhi::TextureUsage usage) {
+  MTL::TextureUsage mtl_usage{};
+  if (usage & rhi::TextureUsage::RenderTarget) {
+    mtl_usage |= MTL::TextureUsageRenderTarget;
+  }
+  if (usage & rhi::TextureUsage::RenderTarget) {
+    mtl_usage |= MTL::TextureUsageShaderRead;
+  }
+  if (usage & rhi::TextureUsage::ShaderWrite) {
+    mtl_usage |= MTL::TextureUsageShaderWrite;
+  }
+  return mtl_usage;
+}
+
 NS::SharedPtr<NS::String> make_ns_string(const char* str) {
   return NS::TransferPtr(NS::String::string(str, NS::UTF8StringEncoding));
 }
@@ -63,7 +89,21 @@ void MetalDevice::init() {
 
   main_residency_set_ =
       NS::TransferPtr(device_->newResidencySet(residency_set_descriptor.get(), &error));
+  ASSERT(!error);
   queue_->addResidencySet(main_residency_set_.get());
+
+  {
+    auto tex_view_pool_desc = NS::TransferPtr(MTL::ResourceViewPoolDescriptor::alloc()->init());
+    // TODO: improve
+    tex_view_pool_desc->setResourceViewCount(512);
+    tex_desc_heap_.tex_view_pool =
+        NS::TransferPtr(device_->newTextureViewPool(tex_view_pool_desc.get(), &error));
+    ASSERT(!error);
+    auto base_resource_id = tex_desc_heap_.tex_view_pool->baseResourceID();
+    tex_desc_heap_.base_id_buf = NS::TransferPtr(device_->newBuffer(
+        &base_resource_id, sizeof(base_resource_id), MTL::ResourceStorageModeShared));
+    make_resident(tex_desc_heap_.base_id_buf.get());
+  }
 }
 
 void MetalDevice::create_swapchain(const rhi::SwapchainDesc& desc, SDL_Window* window,
@@ -142,7 +182,7 @@ bool MetalDevice::create_texture(rhi::Texture& tex, const rhi::TextureDesc& desc
 
   auto* internal_data = to_internal(tex);
   auto tex_desc = NS::TransferPtr(MTL::TextureDescriptor::alloc()->init());
-  tex_desc->setTextureType(MTL::TextureType2D); // TODO: fix this
+  tex_desc->setTextureType(to_metal(desc.type));
   tex_desc->setWidth(desc.width);
   tex_desc->setHeight(desc.height);
   tex_desc->setDepth(desc.depth);
@@ -150,31 +190,18 @@ bool MetalDevice::create_texture(rhi::Texture& tex, const rhi::TextureDesc& desc
   tex_desc->setAllowGPUOptimizedContents(true);
   tex_desc->setArrayLength(desc.array_length);
   tex_desc->setMipmapLevelCount(desc.mip_count);
+  tex_desc->setUsage(to_metal(desc.usage));
 
   internal_data->texture = NS::TransferPtr(device_->newTexture(tex_desc.get()));
-  // TODO: create a default view
+  make_resident(internal_data->texture.get());
 
   return true;
 }
 
-bool MetalDevice::create_texture_view(rhi::Texture& /*tex*/, const rhi::TextureViewDesc& desc,
-                                      rhi::TextureView& tex_view) {
-  tex_view.internal_data.reset();
-  tex_view.internal_data = wi::allocator::make_shared<TextureView_Metal>();
-  tex_view.desc = desc;
-
-  auto tex_view_desc = NS::TransferPtr(MTL::TextureViewDescriptor::alloc()->init());
-  // TODO: set the type
-  tex_view_desc->setTextureType(MTL::TextureType2D);
-  tex_view_desc->setLevelRange(NS::Range::Make(0, 1));
-  tex_view_desc->setSliceRange(NS::Range::Make(0, 1));
-  tex_view_desc->setPixelFormat(MTL::PixelFormatDepth32Float);
-
-  // auto resource_view_pool_desc =
-  // NS::TransferPtr(MTL::ResourceViewPoolDescriptor::alloc()->init());
-  // resource_view_pool_desc->setResourceViewCount(32);
-  // device_->newTextureViewPool();
-  return true;
+void MetalDevice::destroy_texture(rhi::Texture& texture) {
+  auto* internal_data = to_internal(texture);
+  remove_resident(internal_data->texture.get());
+  texture.internal_data.reset();
 }
 
 bool MetalDevice::create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& pipeline) {
@@ -337,9 +364,11 @@ rhi::CmdEncoder* MetalDevice::begin_cmd_encoder(rhi::CmdPool& pool) {
     auto arg_table_desc = NS::TransferPtr(MTL4::ArgumentTableDescriptor::alloc()->init());
     arg_table_desc->setInitializeBindings(true);
     arg_table_desc->setLabel(NS::String::string("arg_table", NS::UTF8StringEncoding));
-    arg_table_desc->setMaxBufferBindCount(1);
+    arg_table_desc->setMaxBufferBindCount(3);
     NS::Error* error{};
     enc->arg_table_ = NS::TransferPtr(device_->newArgumentTable(arg_table_desc.get(), &error));
+    enc->arg_table_->setAddress(tex_desc_heap_.base_id_buf->gpuAddress(),
+                                k_descriptor_heap_arg_table_index);
     ASSERT(!error);
   }
 
@@ -394,8 +423,13 @@ void MetalDevice::submit(std::span<rhi::CmdEncoder*> cmds) {
   frame.fence->waitUntilSignaledValue(frame.fence_value, UINT64_MAX);
 }
 
-void MetalDevice::make_resident(MTL::Allocation* buf) {
-  main_residency_set_->addAllocation(buf);
+void MetalDevice::make_resident(MTL::Allocation* alloc) {
+  main_residency_set_->addAllocation(alloc);
+  main_residency_set_->commit();
+}
+
+void MetalDevice::remove_resident(MTL::Allocation* alloc) {
+  main_residency_set_->removeAllocation(alloc);
   main_residency_set_->commit();
 }
 
@@ -434,6 +468,12 @@ bool MetalDevice::create_buffer(const rhi::BufferDesc& desc, rhi::Buffer& buffer
   return true;
 }
 
+void MetalDevice::destroy_buffer(rhi::Buffer& buffer) {
+  auto* internal_data = to_internal(buffer);
+  remove_resident(internal_data->buffer.get());
+  buffer.internal_data.reset();
+}
+
 bool MetalDevice::create_cmd_pool(rhi::CmdPool& pool) {
   pool.internal_data.reset();
   pool.internal_data = wi::allocator::make_shared<CmdPool_Metal>();
@@ -449,6 +489,23 @@ void MetalDevice::reset_cmd_pool(rhi::CmdPool& pool) {
     internal_data->free_encoders.push_back(std::move(enc));
   }
   internal_data->encoders.clear();
+}
+
+void MetalDevice::write_texture_desc(const rhi::TextureDescriptorDesc& desc, rhi::Texture& texture,
+                                     uint32_t index) {
+
+  auto tex_view_desc = NS::TransferPtr(MTL::TextureViewDescriptor::alloc()->init());
+  // TODO: set the type
+  tex_view_desc->setTextureType(to_metal(desc.texture_type));
+  tex_view_desc->setLevelRange(
+      NS::Range::Make(desc.mip, desc.mip_count == 0 ? texture.desc.mip_count : desc.mip_count));
+  tex_view_desc->setSliceRange(NS::Range::Make(
+      desc.slice, desc.array_length == 0 ? texture.desc.array_length : desc.array_length));
+
+  auto* tex_internal_data = to_internal(texture);
+  tex_view_desc->setPixelFormat(tex_internal_data->texture.get()->pixelFormat());
+  tex_desc_heap_.tex_view_pool->setTextureView(tex_internal_data->texture.get(),
+                                               tex_view_desc.get(), index);
 }
 
 } // namespace gfx::metal

@@ -36,11 +36,13 @@ public:
   bool create_shader(rhi::ShaderType type, const void* data, size_t size, rhi::Shader& shader,
                      std::string_view entry_point) override;
   bool create_texture(rhi::Texture& tex, const rhi::TextureDesc& desc) override;
-  bool create_texture_view(rhi::Texture& tex, const rhi::TextureViewDesc& desc,
-                           rhi::TextureView& tex_view) override;
+  void destroy_texture(rhi::Texture& texture) override;
   bool create_buffer(const rhi::BufferDesc& desc, rhi::Buffer& buffer) override;
+  void destroy_buffer(rhi::Buffer& buffer) override;
   bool create_cmd_pool(rhi::CmdPool& pool) override;
   void reset_cmd_pool(rhi::CmdPool& pool) override;
+  void write_texture_desc(const rhi::TextureDescriptorDesc& desc, rhi::Texture& texture,
+                          uint32_t index) override;
 
   rhi::CmdEncoder* begin_cmd_encoder(rhi::CmdPool& pool) override;
   void end_cmd_encoder(rhi::CmdEncoder* encoder) override;
@@ -61,7 +63,8 @@ private:
       return static_cast<size_t>(hash.get_hash());
     }
   };
-  void make_resident(MTL::Allocation* buf);
+  void make_resident(MTL::Allocation* alloc);
+  void remove_resident(MTL::Allocation* alloc);
 
   NS::SharedPtr<MTL::Device> device_;
   NS::SharedPtr<MTL4::CommandQueue> queue_;
@@ -87,6 +90,12 @@ private:
   gch::small_vector<PerFrame, rhi::k_max_frames_in_flight> per_frame_;
 
   NS::SharedPtr<MTL::ResidencySet> main_residency_set_;
+
+  struct TextureDescriptorHeap {
+    NS::SharedPtr<MTL::TextureViewPool> tex_view_pool;
+    NS::SharedPtr<MTL::Buffer> base_id_buf;
+  } tex_desc_heap_;
+  constexpr static auto k_descriptor_heap_arg_table_index{1};
 
   size_t frames_in_flight_{rhi::k_max_frames_in_flight};
   size_t frame_num_{};

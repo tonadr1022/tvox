@@ -1,8 +1,10 @@
 #pragma once
 
 #include "core/Assert.hpp"
+#include "core/Util.hpp"
 #include "graphics/rhi/Graphics.hpp"
 #include <cstddef>
+#include <cstdint>
 
 namespace gfx {
 
@@ -13,6 +15,13 @@ public:
 
   template <typename T>
   rhi::GpuCpuRange<T> allocate(size_t size) {
+    constexpr size_t alignment = 16;
+    ASSERT(offset_ <= range_.size);
+    const auto address = reinterpret_cast<std::uintptr_t>(range_.gpu) + offset_;
+    const size_t padding = align_up(address, alignment) - address;
+    ASSERT(padding <= range_.size - offset_);
+    offset_ += padding;
+
     size_t required_size = size * sizeof(T);
     ASSERT(required_size <= range_.size - offset_);
     rhi::GpuCpuRange<T> range{
