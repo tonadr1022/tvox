@@ -112,7 +112,7 @@ void MetalDevice::create_swapchain(const rhi::SwapchainDesc& desc, SDL_Window* w
   swapchain.desc.format = rhi::Format::Bgra8Unorm;
 
   if (!swapchain.internal_data) {
-    swapchain.internal_data = wi::allocator::make_shared<Swapchain_Metal>();
+    swapchain.internal_data = wi::allocator::make_shared<SwapchainMetal>();
     LINFO("made internal swapchain data");
   }
   auto* internal_data = to_internal(swapchain);
@@ -142,8 +142,8 @@ bool MetalDevice::create_shader(rhi::ShaderType type, const void* data, size_t s
                                 rhi::Shader& shader, std::string_view entry_point) {
   bool success{true};
   shader.internal_data.reset();
-  shader.internal_data = wi::allocator::make_shared<Shader_Metal>();
-  Shader_Metal* internal_data = to_internal(shader);
+  shader.internal_data = wi::allocator::make_shared<ShaderMetal>();
+  ShaderMetal* internal_data = to_internal(shader);
 
   dispatch_data_t dispatch_data =
       dispatch_data_create(data, size, dispatch_get_main_queue(), nullptr);
@@ -177,7 +177,7 @@ bool MetalDevice::create_shader(rhi::ShaderType type, const void* data, size_t s
 
 bool MetalDevice::create_texture(rhi::Texture& tex, const rhi::TextureDesc& desc) {
   tex.internal_data.reset();
-  tex.internal_data = wi::allocator::make_shared<Texture_Metal>();
+  tex.internal_data = wi::allocator::make_shared<TextureMetal>();
   tex.desc = desc;
 
   auto* internal_data = to_internal(tex);
@@ -207,7 +207,7 @@ void MetalDevice::destroy_texture(rhi::Texture& texture) {
 bool MetalDevice::create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& pipeline) {
   pipeline.desc = desc;
   pipeline.internal_data.reset();
-  pipeline.internal_data = wi::allocator::make_shared<Pipeline_Metal>();
+  pipeline.internal_data = wi::allocator::make_shared<PipelineMetal>();
   // TODO: wtf are we doing here.
   pipelines_cache_.clear();
   return true;
@@ -215,7 +215,7 @@ bool MetalDevice::create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& 
 
 bool MetalDevice::create_gpu_heap(const rhi::GpuHeapDesc& desc, rhi::GpuHeap& heap) {
   heap.internal_data.reset();
-  heap.internal_data = wi::allocator::make_shared<GpuHeap_Metal>();
+  heap.internal_data = wi::allocator::make_shared<GpuHeapMetal>();
   auto* internal_data = to_internal(heap);
 
   MTL::ResourceOptions options{};
@@ -261,7 +261,7 @@ bool MetalDevice::create_gpu_heap(const rhi::GpuHeapDesc& desc, rhi::GpuHeap& he
 bool MetalDevice::create_pipeline(const rhi::Shader& compute_shader, rhi::Pipeline& pipeline) {
   pipeline.desc = {};
   pipeline.internal_data.reset();
-  pipeline.internal_data = wi::allocator::make_shared<Pipeline_Metal>();
+  pipeline.internal_data = wi::allocator::make_shared<PipelineMetal>();
 
   auto* internal_data = to_internal(pipeline);
 
@@ -437,7 +437,7 @@ void MetalDevice::remove_resident(MTL::Allocation* alloc) {
 
 bool MetalDevice::create_buffer(const rhi::BufferDesc& desc, rhi::Buffer& buffer) {
   buffer.internal_data.reset();
-  buffer.internal_data = wi::allocator::make_shared<Buffer_Metal>();
+  buffer.internal_data = wi::allocator::make_shared<BufferMetal>();
   auto* internal_data = to_internal(buffer);
   ASSERT(desc.size > 0);
 
@@ -478,7 +478,7 @@ void MetalDevice::destroy_buffer(rhi::Buffer& buffer) {
 
 bool MetalDevice::create_cmd_pool(rhi::CmdPool& pool) {
   pool.internal_data.reset();
-  pool.internal_data = wi::allocator::make_shared<CmdPool_Metal>();
+  pool.internal_data = wi::allocator::make_shared<CmdPoolMetal>();
   auto* internal_data = to_internal(pool);
   internal_data->cmd_allocator = NS::TransferPtr(device_->newCommandAllocator());
   return true;

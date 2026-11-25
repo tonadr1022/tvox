@@ -3,6 +3,7 @@
 // clang-format off
 #include "graphics/rhi/Graphics.hpp"
 #include <Metal/MTL4CommandAllocator.hpp>
+#include <Metal/MTLEvent.hpp>
 #include <deque>
 #include <type_traits> // IWYU pragma: keep
 #include <Foundation/NSSharedPtr.hpp>
@@ -22,42 +23,42 @@ namespace gfx::metal {
 
 class MetalCmdEncoder;
 // TODO: why is this not in a namespace
-struct Swapchain_Metal {
+struct SwapchainMetal {
   NS::SharedPtr<CA::MetalLayer> layer;
   NS::SharedPtr<MTL::Texture> curr_texture;
 };
 
-struct Shader_Metal {
+struct ShaderMetal {
   NS::SharedPtr<MTL::Library> library;
   NS::SharedPtr<MTL::Function> function;
 };
 
-struct Pipeline_Metal {
+struct PipelineMetal {
   NS::SharedPtr<MTL::RenderPipelineState> render_pipeline;
   NS::SharedPtr<MTL::ComputePipelineState> compute_pipeline;
 };
 
-struct GpuHeap_Metal {
+struct GpuHeapMetal {
   NS::SharedPtr<MTL::Heap> heap;
   NS::SharedPtr<MTL::Buffer> buffer;
 };
 
-struct Buffer_Metal {
+struct BufferMetal {
   NS::SharedPtr<MTL::Buffer> buffer;
 };
 
-struct CmdPool_Metal {
+struct CmdPoolMetal {
   std::deque<std::unique_ptr<MetalCmdEncoder>> encoders;
   std::deque<std::unique_ptr<MetalCmdEncoder>> free_encoders;
   NS::SharedPtr<MTL4::CommandAllocator> cmd_allocator;
 };
 
-struct Texture_Metal {
+struct TextureMetal {
   NS::SharedPtr<MTL::Texture> texture;
 };
 
-struct TextureViewMetal {
-  NS::SharedPtr<MTL::Texture> view_texture;
+struct TimelineSemaphoreMetal {
+  NS::SharedPtr<MTL::SharedEvent> event;
 };
 
 template <typename T>
@@ -66,7 +67,7 @@ struct MetalType;
 #define MAKE_METAL_TYPE(name)                                                                      \
   template <>                                                                                      \
   struct MetalType<gfx::rhi::name> {                                                               \
-    using type = name##_Metal;                                                                     \
+    using type = name##Metal;                                                                      \
   };
 
 MAKE_METAL_TYPE(Swapchain)

@@ -125,6 +125,8 @@ void Renderer::render() {
   if (w <= 0 || h <= 0) {
     return;
   }
+  // TODO: wait for timeline semaphore
+
   {
     // swapchain resize
     if (w != swapchain_.desc.width || h != swapchain_.desc.height) {
@@ -141,8 +143,6 @@ void Renderer::render() {
 
   glm::mat4 projection_matrix = glm::perspective(glm::radians(70.f), aspect, 0.1f, 500.f);
   glm::mat4 view_matrix = glm::lookAt(glm::vec3{0, 5, 5}, glm::vec3{0, 0, 0}, glm::vec3{0, 1, 0});
-
-  // TODO: wait for timeline semaphore
 
   size_t frame_in_flight = frame_num_ % frames_in_flight_;
   auto& frame_allocator = frame_allocators_[frame_in_flight];
