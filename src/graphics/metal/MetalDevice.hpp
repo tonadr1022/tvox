@@ -9,7 +9,6 @@
 #include "graphics/rhi/CmdEncoder.hpp"
 #include "graphics/rhi/Device.hpp"
 #include "graphics/rhi/Graphics.hpp"
-#include "small_vector/small_vector.hpp"
 
 #include <Metal/Metal.hpp>
 #include <string_view>
@@ -33,7 +32,7 @@ public:
   bool create_pipeline(const rhi::PipelineDesc& desc, rhi::Pipeline& pipeline) override;
   bool create_pipeline(const rhi::Shader& compute_shader, rhi::Pipeline& pipeline) override;
   bool create_gpu_heap(const rhi::GpuHeapDesc& desc, rhi::GpuHeap& heap) override;
-  bool create_shader(rhi::ShaderType type, const void* data, size_t size, rhi::Shader& shader,
+  bool create_shader(rhi::ShaderType type, const void* data, uint64_t size, rhi::Shader& shader,
                      std::string_view entry_point) override;
   bool create_texture(rhi::Texture& tex, const rhi::TextureDesc& desc) override;
   void destroy_texture(rhi::Texture& texture) override;
@@ -43,6 +42,8 @@ public:
   void reset_cmd_pool(rhi::CmdPool& pool) override;
   void write_texture_desc(const rhi::TextureDescriptorDesc& desc, rhi::Texture& texture,
                           uint32_t index) override;
+  void create_timeline_semaphore(rhi::TimelineSemaphore& sema) override;
+  void wait_timeline_semaphore(rhi::TimelineSemaphore& sema, uint64_t value) override;
 
   rhi::CmdEncoder* begin_cmd_encoder(rhi::CmdPool& pool) override;
   void end_cmd_encoder(rhi::CmdEncoder* encoder) override;
@@ -51,7 +52,7 @@ public:
     return device_.get();
   }
 
-  void submit(std::span<rhi::CmdEncoder*> cmds) override;
+  void submit(std::span<rhi::CmdEncoder*> cmds, rhi::TimelinePoint& timeline_point) override;
 
   MTL::RenderPipelineState*
   get_or_create_render_pipeline(rhi::Pipeline& pipeline,
@@ -72,23 +73,6 @@ private:
   std::unordered_map<rhi::PipelineHash, NS::SharedPtr<MTL::RenderPipelineState>, PipelineHashHasher>
       pipelines_cache_;
 
-  struct PerFrame {
-    NS::SharedPtr<MTL::SharedEvent> fence;
-    size_t fence_value{};
-  };
-
-  // TODO: idt the device should have a notion of "current frame"
-  [[nodiscard]]
-  size_t curr_frame_in_flight() const {
-    return frame_num_ % frames_in_flight_;
-  }
-
-  PerFrame& curr_frame() {
-    return per_frame_[curr_frame_in_flight()];
-  }
-
-  gch::small_vector<PerFrame, rhi::k_max_frames_in_flight> per_frame_;
-
   NS::SharedPtr<MTL::ResidencySet> main_residency_set_;
 
   struct TextureDescriptorHeap {
@@ -98,7 +82,6 @@ private:
   constexpr static auto k_descriptor_heap_arg_table_index{1};
 
   size_t frames_in_flight_{rhi::k_max_frames_in_flight};
-  size_t frame_num_{};
 };
 
 } // namespace gfx::metal

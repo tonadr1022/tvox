@@ -242,6 +242,15 @@ struct CmdPool {
   wi::allocator::shared_ptr<void> internal_data;
 };
 
+struct TimelineSemaphore {
+  wi::allocator::shared_ptr<void> internal_data;
+};
+
+struct TimelinePoint {
+  TimelineSemaphore sema;
+  uint64_t value;
+};
+
 inline GpuCpuRange<std::byte> gpu_cpu_range(rhi::Buffer& buffer) {
   return {
       .cpu = reinterpret_cast<std::byte*>(buffer.cpu_ptr),

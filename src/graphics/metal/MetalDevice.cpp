@@ -77,11 +77,6 @@ void MetalDevice::init() {
 
   queue_ = NS::TransferPtr(device_->newMTL4CommandQueue());
 
-  for (int i = 0; i < frames_in_flight_; i++) {
-    auto& frame = per_frame_[i];
-    frame.fence = NS::TransferPtr(device_->newSharedEvent());
-  }
-
   NS::Error* error{};
   auto residency_set_descriptor = NS::TransferPtr(MTL::ResidencySetDescriptor::alloc()->init());
   residency_set_descriptor->setInitialCapacity(256);
@@ -138,7 +133,7 @@ void MetalDevice::create_swapchain(const rhi::SwapchainDesc& desc, SDL_Window* w
   });
 }
 
-bool MetalDevice::create_shader(rhi::ShaderType type, const void* data, size_t size,
+bool MetalDevice::create_shader(rhi::ShaderType type, const void* data, uint64_t size,
                                 rhi::Shader& shader, std::string_view entry_point) {
   bool success{true};
   shader.internal_data.reset();
@@ -386,8 +381,7 @@ void MetalDevice::end_cmd_encoder([[maybe_unused]] rhi::CmdEncoder* encoder) {
   mtl_enc->cmd_buf_->endCommandBuffer();
 }
 
-void MetalDevice::submit(std::span<rhi::CmdEncoder*> cmds) {
-  auto& frame = curr_frame();
+void MetalDevice::submit(std::span<rhi::CmdEncoder*> cmds, rhi::TimelinePoint& timeline_point) {
 
   std::vector<MTL4::CommandBuffer*> submit_cmd_buffers;
   submit_cmd_buffers.reserve(cmds.size());
@@ -415,14 +409,8 @@ void MetalDevice::submit(std::span<rhi::CmdEncoder*> cmds) {
   // TODO: should we just expose fences to the renderer? think about this
 
   // signal fence for the frame after work is complete
-  frame.fence_value++;
-  queue_->signalEvent(frame.fence.get(), frame.fence_value);
-
-  frame_num_++;
-
-  // wait for the fence from FRAMES_IN_FLIGHT frames ago
-  frame = curr_frame();
-  frame.fence->waitUntilSignaledValue(frame.fence_value, UINT64_MAX);
+  auto* timeline_sema_internal_data = to_internal(timeline_point.sema);
+  queue_->signalEvent(timeline_sema_internal_data->event.get(), timeline_point.value);
 }
 
 void MetalDevice::make_resident(MTL::Allocation* alloc) {
@@ -508,6 +496,18 @@ void MetalDevice::write_texture_desc(const rhi::TextureDescriptorDesc& desc, rhi
   tex_view_desc->setPixelFormat(tex_internal_data->texture.get()->pixelFormat());
   tex_desc_heap_.tex_view_pool->setTextureView(tex_internal_data->texture.get(),
                                                tex_view_desc.get(), index);
+}
+
+void MetalDevice::create_timeline_semaphore(rhi::TimelineSemaphore& sema) {
+  sema.internal_data.reset();
+  sema.internal_data = wi::allocator::make_shared<TimelineSemaphoreMetal>();
+  auto* internal_data = to_internal(sema);
+  internal_data->event = NS::TransferPtr(device_->newSharedEvent());
+}
+
+void MetalDevice::wait_timeline_semaphore(rhi::TimelineSemaphore& sema, uint64_t value) {
+  auto* internal_data = to_internal(sema);
+  internal_data->event->waitUntilSignaledValue(value, UINT64_MAX);
 }
 
 } // namespace gfx::metal

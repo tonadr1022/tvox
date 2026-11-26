@@ -42,6 +42,7 @@ private:
   std::unique_ptr<gfx::rhi::Device> device_;
   gfx::rhi::Swapchain swapchain_;
 
+  rhi::TimelinePoint latest_completion_sema_;
   rhi::Shader basic_vs_;
   rhi::Shader basic_fs_;
   rhi::Shader basic_cs_;

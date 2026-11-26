@@ -77,6 +77,7 @@ MAKE_METAL_TYPE(GpuHeap)
 MAKE_METAL_TYPE(Buffer)
 MAKE_METAL_TYPE(CmdPool)
 MAKE_METAL_TYPE(Texture)
+MAKE_METAL_TYPE(TimelineSemaphore)
 
 #undef MAKE_METAL_TYPE
 

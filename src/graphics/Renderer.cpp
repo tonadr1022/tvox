@@ -52,6 +52,7 @@ void Renderer::init(const InitInfo& info) {
 
   model_res = load_model("/Users/tony/personal/tvox/resources/models/Cube/glTF/Cube.gltf");
 
+  device_->create_timeline_semaphore(latest_completion_sema_.sema);
   texture_descriptor_index_allocator_.init(
       512); // TODO: don't hardcode this. might need to make desc heap public
 
@@ -104,7 +105,8 @@ void Renderer::init(const InitInfo& info) {
 
       // TODO: is this really where we want to be submitting
       rhi::CmdEncoder* cmds[] = {enc};
-      device_->submit(cmds);
+      latest_completion_sema_.value++;
+      device_->submit(cmds, latest_completion_sema_);
     }
   }
 
@@ -119,6 +121,10 @@ void Renderer::init(const InitInfo& info) {
 }
 
 void Renderer::render() {
+  if (latest_completion_sema_.value > frames_in_flight_) {
+    device_->wait_timeline_semaphore(latest_completion_sema_.sema,
+                                     latest_completion_sema_.value - frames_in_flight_ + 1);
+  }
 
   int w{}, h{};
   SDL_GetWindowSize(window_, &w, &h);
@@ -200,9 +206,10 @@ void Renderer::render() {
   device_->end_cmd_encoder(enc);
 
   rhi::CmdEncoder* cmds[] = {enc};
-  device_->submit(cmds);
 
   frame_num_++;
+  latest_completion_sema_.value++;
+  device_->submit(cmds, latest_completion_sema_);
 }
 
 void Renderer::reload_shaders() {
