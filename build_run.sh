@@ -7,6 +7,6 @@ export MTL_HUD_ENABLED=1
 export MTL_SHADER_VALIDATION_GLOBAL_MEMORY=1
 set -euo pipefail
 
-cmake --build build
+cmake --build build/Debug
 # cmake --build build/DebugASan
-./build/src/tvox "$@"
+./build/Debug/src/tvox "$@"

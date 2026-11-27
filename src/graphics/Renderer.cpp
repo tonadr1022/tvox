@@ -201,8 +201,8 @@ void Renderer::render() {
 
   frame_num_++;
   latest_completion_sema_.value++;
-  // TODO: cpp26 for direct init list -> span
-  rhi::TimelinePoint waits[] = {upload_timeline_pt};
+
+  const rhi::TimelinePoint waits[] = {upload_timeline_pt};
   device_->submit(cmds, waits, latest_completion_sema_);
 }
 

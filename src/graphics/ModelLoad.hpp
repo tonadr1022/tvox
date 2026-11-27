@@ -3,6 +3,7 @@
 #include "vertex_shared.h"
 #include <filesystem>
 #include <glm/vec3.hpp>
+#include <vector>
 
 namespace gfx {
 
