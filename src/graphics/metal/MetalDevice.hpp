@@ -25,7 +25,10 @@ class MetalDevice : public gfx::rhi::Device {
 public:
   ~MetalDevice() override;
 
-  void init() override;
+  void init(const rhi::DeviceInitInfo& init_info) override;
+  const rhi::DeviceCaps& get_device_caps() const override {
+    return caps_;
+  }
 
   void create_swapchain(const rhi::SwapchainDesc& desc, SDL_Window* window,
                         rhi::Swapchain& swapchain) override;
@@ -38,7 +41,7 @@ public:
   void destroy_texture(rhi::Texture& texture) override;
   bool create_buffer(const rhi::BufferDesc& desc, rhi::Buffer& buffer) override;
   void destroy_buffer(rhi::Buffer& buffer) override;
-  bool create_cmd_pool(rhi::CmdPool& pool) override;
+  bool create_cmd_pool(rhi::CmdPool& pool, uint32_t queue_index) override;
   void reset_cmd_pool(rhi::CmdPool& pool) override;
   void write_texture_desc(const rhi::TextureDescriptorDesc& desc, rhi::Texture& texture,
                           uint32_t index) override;
@@ -68,7 +71,9 @@ private:
   void remove_resident(MTL::Allocation* alloc);
 
   NS::SharedPtr<MTL::Device> device_;
-  NS::SharedPtr<MTL4::CommandQueue> queue_;
+  static constexpr auto k_max_queue_count = 4;
+  gch::small_vector<NS::SharedPtr<MTL4::CommandQueue>, k_max_queue_count> queues_;
+  rhi::DeviceCaps caps_{};
 
   std::unordered_map<rhi::PipelineHash, NS::SharedPtr<MTL::RenderPipelineState>, PipelineHashHasher>
       pipelines_cache_;

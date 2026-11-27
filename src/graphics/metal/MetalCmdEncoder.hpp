@@ -47,6 +47,7 @@ public:
   NS::SharedPtr<MTL4::CommandAllocator> cmd_allocator_;
   NS::SharedPtr<MTL4::CommandBuffer> cmd_buf_;
   MetalDevice* device_{};
+  uint32_t queue_index{};
   rhi::RenderPassInfo renderpass_info_{};
 
   struct PendingBarrier {

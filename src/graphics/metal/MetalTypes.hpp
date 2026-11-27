@@ -51,6 +51,7 @@ struct CmdPoolMetal {
   std::deque<std::unique_ptr<MetalCmdEncoder>> encoders;
   std::deque<std::unique_ptr<MetalCmdEncoder>> free_encoders;
   NS::SharedPtr<MTL4::CommandAllocator> cmd_allocator;
+  uint32_t queue_index{};
 };
 
 struct TextureMetal {

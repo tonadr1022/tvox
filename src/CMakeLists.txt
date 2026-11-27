@@ -23,6 +23,7 @@ add_executable(${target_name}
   platform/Window.cpp
   graphics/Renderer.cpp
   graphics/ModelLoad.cpp
+  graphics/util/UploadQueue.cpp
   graphics/rhi/Device.cpp
 )
 

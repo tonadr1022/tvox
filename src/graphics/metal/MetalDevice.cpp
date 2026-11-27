@@ -10,6 +10,7 @@
 #include "graphics/rhi/Graphics.hpp"
 
 #include <Foundation/NSSharedPtr.hpp>
+#include <Metal/MTL4CommandQueue.hpp>
 #include <Metal/MTLDevice.hpp>
 #include <Metal/MTLHeap.hpp>
 #include <Metal/MTLPixelFormat.hpp>
@@ -17,6 +18,7 @@
 #include <Metal/MTLResource.hpp>
 #include <Metal/MTLTexture.hpp>
 #include <QuartzCore/CAMetalLayer.hpp>
+#include <array>
 #include <string>
 
 namespace gfx::metal {
@@ -70,12 +72,26 @@ NS::SharedPtr<NS::String> make_ns_string(const char* str) {
 
 MetalDevice::~MetalDevice() = default;
 
-void MetalDevice::init() {
+void MetalDevice::init(const rhi::DeviceInitInfo& init_info) {
   device_ = NS::TransferPtr(MTL::CreateSystemDefaultDevice());
 
   frames_in_flight_ = rhi::k_max_frames_in_flight;
 
-  queue_ = NS::TransferPtr(device_->newMTL4CommandQueue());
+  for (uint32_t i = 0; i < init_info.desired_generic_queue_count; i++) {
+    auto queue_index = queues_.size();
+    queues_.emplace_back(NS::TransferPtr(device_->newMTL4CommandQueue()));
+    caps_.general_queue_indices.push_back(queue_index);
+  }
+  for (uint32_t i = 0; i < init_info.desired_compute_only_queue_count; i++) {
+    auto queue_index = queues_.size();
+    queues_.emplace_back(NS::TransferPtr(device_->newMTL4CommandQueue()));
+    caps_.general_queue_indices.push_back(queue_index);
+  }
+  for (uint32_t i = 0; i < init_info.desired_copy_only_queue_count; i++) {
+    auto queue_index = queues_.size();
+    queues_.emplace_back(NS::TransferPtr(device_->newMTL4CommandQueue()));
+    caps_.general_queue_indices.push_back(queue_index);
+  }
 
   NS::Error* error{};
   auto residency_set_descriptor = NS::TransferPtr(MTL::ResidencySetDescriptor::alloc()->init());
@@ -85,7 +101,10 @@ void MetalDevice::init() {
   main_residency_set_ =
       NS::TransferPtr(device_->newResidencySet(residency_set_descriptor.get(), &error));
   ASSERT(!error);
-  queue_->addResidencySet(main_residency_set_.get());
+
+  for (auto& queue : queues_) {
+    queue->addResidencySet(main_residency_set_.get());
+  }
 
   {
     auto tex_view_pool_desc = NS::TransferPtr(MTL::ResourceViewPoolDescriptor::alloc()->init());
@@ -122,7 +141,9 @@ void MetalDevice::create_swapchain(const rhi::SwapchainDesc& desc, SDL_Window* w
     layer->setDisplaySyncEnabled(true);
     layer->setMaximumDrawableCount(3);
 
-    queue_->addResidencySet(layer->residencySet());
+    for (auto& queue : queues_) {
+      queue->addResidencySet(layer->residencySet());
+    }
     set_layer_for_window(window, layer);
   }
 
@@ -352,6 +373,7 @@ rhi::CmdEncoder* MetalDevice::begin_cmd_encoder(rhi::CmdPool& pool) {
     enc = internal_data->encoders.emplace_back(std::make_unique<MetalCmdEncoder>()).get();
     enc->device_ = this;
     enc->cmd_buf_ = NS::TransferPtr(device_->newCommandBuffer());
+    enc->queue_index = internal_data->queue_index;
 
     // TODO: should this be per-command buffer, what are the tradeoffs, what are apple docs
     enc->cmd_allocator_ = internal_data->cmd_allocator;
@@ -382,35 +404,41 @@ void MetalDevice::end_cmd_encoder([[maybe_unused]] rhi::CmdEncoder* encoder) {
 }
 
 void MetalDevice::submit(std::span<rhi::CmdEncoder*> cmds, rhi::TimelinePoint& timeline_point) {
-
-  std::vector<MTL4::CommandBuffer*> submit_cmd_buffers;
-  submit_cmd_buffers.reserve(cmds.size());
+  std::array<std::vector<MTL4::CommandBuffer*>, k_max_queue_count> submit_cmd_buffers_per_queue;
   for (auto* enc : cmds) {
     auto* mtl_enc = reinterpret_cast<MetalCmdEncoder*>(enc);
-    submit_cmd_buffers.emplace_back(mtl_enc->cmd_buf_.get());
+    uint32_t queue_index = mtl_enc->queue_index;
+    auto& queue = queues_[queue_index];
+    submit_cmd_buffers_per_queue[queue_index].emplace_back(mtl_enc->cmd_buf_.get());
 
     for (auto& drawable : mtl_enc->presents_) {
-      queue_->wait(drawable.get());
+      queue->wait(drawable.get());
     }
   }
 
-  queue_->commit(submit_cmd_buffers.data(), submit_cmd_buffers.size());
+  for (size_t i = 0; i < k_max_queue_count; i++) {
+    auto& submit_cmd_buffers = submit_cmd_buffers_per_queue[i];
+    if (!submit_cmd_buffers.empty()) {
+      auto& queue = queues_[i];
+      queue->commit(submit_cmd_buffers.data(), submit_cmd_buffers.size());
+    }
+  }
 
   for (auto* enc : cmds) {
     auto* mtl_enc = reinterpret_cast<MetalCmdEncoder*>(enc);
 
     for (auto& drawable : mtl_enc->presents_) {
-      queue_->signalDrawable(drawable.get());
+      auto& queue = queues_[mtl_enc->queue_index];
+      queue->signalDrawable(drawable.get());
       drawable->present();
     }
     mtl_enc->presents_.clear();
   }
 
-  // TODO: should we just expose fences to the renderer? think about this
-
-  // signal fence for the frame after work is complete
   auto* timeline_sema_internal_data = to_internal(timeline_point.sema);
-  queue_->signalEvent(timeline_sema_internal_data->event.get(), timeline_point.value);
+  for (auto& queue : queues_) {
+    queue->signalEvent(timeline_sema_internal_data->event.get(), timeline_point.value);
+  }
 }
 
 void MetalDevice::make_resident(MTL::Allocation* alloc) {
@@ -464,10 +492,11 @@ void MetalDevice::destroy_buffer(rhi::Buffer& buffer) {
   buffer.internal_data.reset();
 }
 
-bool MetalDevice::create_cmd_pool(rhi::CmdPool& pool) {
+bool MetalDevice::create_cmd_pool(rhi::CmdPool& pool, uint32_t queue_index) {
   pool.internal_data.reset();
   pool.internal_data = wi::allocator::make_shared<CmdPoolMetal>();
   auto* internal_data = to_internal(pool);
+  internal_data->queue_index = queue_index;
   internal_data->cmd_allocator = NS::TransferPtr(device_->newCommandAllocator());
   return true;
 }

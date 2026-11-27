@@ -13,6 +13,7 @@
 #include "graphics/rhi/ShaderType.hpp"
 #include "graphics/shaders/TechniqueRegistry.hpp"
 #include "post_process_shared.h"
+#include "vertex_shared.h"
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
@@ -48,7 +49,12 @@ void Renderer::init(const InitInfo& info) {
   window_ = info.window;
 
   device_ = make_device();
-  device_->init();
+  device_->init({
+      .desired_generic_queue_count = 1,
+      .desired_compute_only_queue_count = 0,
+      .desired_copy_only_queue_count = 1,
+  });
+  upload_queue_.init(device_.get(), 64ull * 1024 * 1024, 3);
 
   model_res = load_model("/Users/tony/personal/tvox/resources/models/Cube/glTF/Cube.gltf");
 
@@ -75,7 +81,7 @@ void Renderer::init(const InitInfo& info) {
   reload_shaders();
 
   for (auto& cmd_pool : cmd_pools_) {
-    device_->create_cmd_pool(cmd_pool);
+    device_->create_cmd_pool(cmd_pool, 0);
   }
 
   {
@@ -85,29 +91,12 @@ void Renderer::init(const InitInfo& info) {
     device_->create_buffer(
         {.size = sizeof(uint32_t) * model_res.indices.size(), .memory_type = MemoryType::GpuOnly},
         index_buf_);
-
-    {
-      rhi::Buffer scratch_upload_buf;
-      device_->create_buffer({.size = 1024ull * 1024 * 10, .memory_type = MemoryType::CpuVisible},
-                             scratch_upload_buf);
-      size_t vertex_buf_size = sizeof(Vertex) * verts.size();
-      memcpy(scratch_upload_buf.cpu_ptr, verts.data(), vertex_buf_size);
-      auto* enc = device_->begin_cmd_encoder(cmd_pools_[0]);
-      enc->copy_buffer_to_buffer(vert_buf_, 0, scratch_upload_buf, 0, vertex_buf_size);
-
-      // indices
-      memcpy(static_cast<uint8_t*>(scratch_upload_buf.cpu_ptr) + vertex_buf_size,
-             model_res.indices.data(), sizeof(uint32_t) * model_res.indices.size());
-      enc->copy_buffer_to_buffer(index_buf_, 0, scratch_upload_buf, vertex_buf_size,
-                                 sizeof(uint32_t) * model_res.indices.size());
-
-      device_->end_cmd_encoder(enc);
-
-      // TODO: is this really where we want to be submitting
-      rhi::CmdEncoder* cmds[] = {enc};
-      latest_completion_sema_.value++;
-      device_->submit(cmds, latest_completion_sema_);
-    }
+    upload_queue_.upload_to_buffer(vert_buf_, 0,
+                                   {reinterpret_cast<std::byte*>(model_res.vertices.data()),
+                                    model_res.vertices.size() * sizeof(Vertex)});
+    upload_queue_.upload_to_buffer(index_buf_, 0,
+                                   {reinterpret_cast<std::byte*>(model_res.indices.data()),
+                                    model_res.indices.size() * sizeof(uint32_t)});
   }
 
   for (size_t i = 0; i < k_max_frames_in_flight; i++) {
@@ -131,7 +120,6 @@ void Renderer::render() {
   if (w <= 0 || h <= 0) {
     return;
   }
-  // TODO: wait for timeline semaphore
 
   {
     // swapchain resize
@@ -145,6 +133,7 @@ void Renderer::render() {
       recreate_textures();
     }
   }
+
   float aspect = static_cast<float>(w) / static_cast<float>(h);
 
   glm::mat4 projection_matrix = glm::perspective(glm::radians(70.f), aspect, 0.1f, 500.f);
@@ -154,6 +143,7 @@ void Renderer::render() {
   auto& frame_allocator = frame_allocators_[frame_in_flight];
   frame_allocator->reset();
 
+  device_->reset_cmd_pool(cmd_pools_[frame_in_flight]);
   auto* enc = device_->begin_cmd_encoder(cmd_pools_[frame_in_flight]);
 
   enc->bind_pipeline(basic_comp_pso_);

@@ -2,6 +2,7 @@
 
 #include "graphics/rhi/Graphics.hpp"
 #include "graphics/rhi/ShaderType.hpp"
+#include "small_vector/small_vector.hpp"
 
 #include <memory>
 #include <span>
@@ -15,11 +16,25 @@ class CmdEncoder;
 class Swapchain;
 struct SwapchainDesc;
 
+struct DeviceInitInfo {
+  uint32_t desired_generic_queue_count{};
+  uint32_t desired_compute_only_queue_count{};
+  uint32_t desired_copy_only_queue_count{};
+};
+
+struct DeviceCaps {
+  using QueueIndices = gch::small_vector<uint32_t, 4>;
+  QueueIndices general_queue_indices;
+  QueueIndices compute_only_queue_indices;
+  QueueIndices copy_only_queue_indices;
+};
+
 class Device {
 public:
   virtual ~Device();
 
-  virtual void init() = 0;
+  virtual void init(const DeviceInitInfo& init_info) = 0;
+  virtual const DeviceCaps& get_device_caps() const = 0;
 
   virtual void create_swapchain(const rhi::SwapchainDesc& desc, SDL_Window* window,
                                 rhi::Swapchain& swapchain) = 0;
@@ -28,7 +43,7 @@ public:
   virtual bool create_gpu_heap(const rhi::GpuHeapDesc& desc, rhi::GpuHeap& heap) = 0;
   virtual bool create_buffer(const rhi::BufferDesc& desc, rhi::Buffer& buffer) = 0;
   virtual void destroy_buffer(rhi::Buffer& buffer) = 0;
-  virtual bool create_cmd_pool(rhi::CmdPool& pool) = 0;
+  virtual bool create_cmd_pool(rhi::CmdPool& pool, uint32_t queue_index) = 0;
   virtual void reset_cmd_pool(rhi::CmdPool& pool) = 0;
   virtual void write_texture_desc(const rhi::TextureDescriptorDesc& desc, rhi::Texture& texture,
                                   uint32_t index) = 0;

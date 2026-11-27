@@ -4,6 +4,7 @@
 #include "graphics/shaders/ShaderCache.hpp"
 #include "graphics/util/BumpAllocator.hpp"
 #include "graphics/util/IndexAllocator.hpp"
+#include "graphics/util/UploadQueue.hpp"
 
 #include <filesystem>
 #include <memory>
@@ -42,6 +43,7 @@ private:
   std::unique_ptr<gfx::rhi::Device> device_;
   gfx::rhi::Swapchain swapchain_;
 
+  UploadQueue upload_queue_;
   rhi::TimelinePoint latest_completion_sema_;
   rhi::Shader basic_vs_;
   rhi::Shader basic_fs_;

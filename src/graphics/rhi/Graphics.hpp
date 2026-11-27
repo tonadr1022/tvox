@@ -248,7 +248,7 @@ struct TimelineSemaphore {
 
 struct TimelinePoint {
   TimelineSemaphore sema;
-  uint64_t value;
+  uint64_t value{};
 };
 
 inline GpuCpuRange<std::byte> gpu_cpu_range(rhi::Buffer& buffer) {
