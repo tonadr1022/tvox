@@ -55,7 +55,8 @@ public:
     return device_.get();
   }
 
-  void submit(std::span<rhi::CmdEncoder*> cmds, rhi::TimelinePoint& timeline_point) override;
+  void submit(std::span<rhi::CmdEncoder*> cmds, std::span<const rhi::TimelinePoint> waits,
+              rhi::TimelinePoint& timeline_point) override;
 
   MTL::RenderPipelineState*
   get_or_create_render_pipeline(rhi::Pipeline& pipeline,

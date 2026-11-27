@@ -19,12 +19,13 @@ private:
   struct StagingBatch {
     rhi::Buffer buffer;
     BumpAllocator allocator;
-    rhi::TimelinePoint timeline;
   };
 
+  rhi::TimelinePoint timeline_;
   rhi::CmdPool cmd_pool_;
   std::vector<StagingBatch> staging_batches_;
   std::vector<StagingBatch> full_batches_;
+  std::vector<rhi::CmdEncoder*> cmd_encoders_;
 };
 
 } // namespace gfx

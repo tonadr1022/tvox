@@ -54,7 +54,9 @@ public:
                              rhi::Shader& shader, std::string_view entry_point) = 0;
   virtual bool create_texture(rhi::Texture& tex, const rhi::TextureDesc& desc) = 0;
   virtual void destroy_texture(rhi::Texture& texture) = 0;
-  virtual void submit(std::span<rhi::CmdEncoder*> cmds, TimelinePoint& timeline_point) = 0;
+  // TODO: waits should be per-queue instead of applying to all queues
+  virtual void submit(std::span<rhi::CmdEncoder*> cmds, std::span<const TimelinePoint> waits,
+                      TimelinePoint& timeline_point) = 0;
   virtual rhi::CmdEncoder* begin_cmd_encoder(rhi::CmdPool& pool) = 0;
   virtual void end_cmd_encoder(rhi::CmdEncoder* encoder) = 0;
 };

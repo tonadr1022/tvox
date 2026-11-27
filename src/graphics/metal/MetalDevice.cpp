@@ -403,7 +403,9 @@ void MetalDevice::end_cmd_encoder([[maybe_unused]] rhi::CmdEncoder* encoder) {
   mtl_enc->cmd_buf_->endCommandBuffer();
 }
 
-void MetalDevice::submit(std::span<rhi::CmdEncoder*> cmds, rhi::TimelinePoint& timeline_point) {
+void MetalDevice::submit(std::span<rhi::CmdEncoder*> cmds,
+                         std::span<const rhi::TimelinePoint> waits,
+                         rhi::TimelinePoint& timeline_point) {
   std::array<std::vector<MTL4::CommandBuffer*>, k_max_queue_count> submit_cmd_buffers_per_queue;
   for (auto* enc : cmds) {
     auto* mtl_enc = reinterpret_cast<MetalCmdEncoder*>(enc);
@@ -420,6 +422,10 @@ void MetalDevice::submit(std::span<rhi::CmdEncoder*> cmds, rhi::TimelinePoint& t
     auto& submit_cmd_buffers = submit_cmd_buffers_per_queue[i];
     if (!submit_cmd_buffers.empty()) {
       auto& queue = queues_[i];
+      for (const auto& wait : waits) {
+        auto* sema_internal_data = to_internal(wait.sema);
+        queue->wait(sema_internal_data->event.get(), wait.value);
+      }
       queue->commit(submit_cmd_buffers.data(), submit_cmd_buffers.size());
     }
   }

@@ -115,6 +115,8 @@ void Renderer::render() {
                                      latest_completion_sema_.value - frames_in_flight_ + 1);
   }
 
+  auto upload_timeline_pt = upload_queue_.flush();
+
   int w{}, h{};
   SDL_GetWindowSize(window_, &w, &h);
   if (w <= 0 || h <= 0) {
@@ -199,7 +201,9 @@ void Renderer::render() {
 
   frame_num_++;
   latest_completion_sema_.value++;
-  device_->submit(cmds, latest_completion_sema_);
+  // TODO: cpp26 for direct init list -> span
+  rhi::TimelinePoint waits[] = {upload_timeline_pt};
+  device_->submit(cmds, waits, latest_completion_sema_);
 }
 
 void Renderer::reload_shaders() {

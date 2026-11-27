@@ -14,8 +14,8 @@ void UploadQueue::init(rhi::Device* device, uint64_t max_size, uint64_t max_pend
     device_->create_buffer({.size = max_size, .memory_type = rhi::MemoryType::CpuVisible}, buf);
     auto range = rhi::gpu_cpu_range(buf);
     auto& batch = staging_batches_.emplace_back(std::move(buf), BumpAllocator{range});
-    device_->create_timeline_semaphore(batch.timeline.sema);
   }
+  device_->create_timeline_semaphore(timeline_.sema);
 }
 
 void UploadQueue::upload_to_buffer(rhi::Buffer& buffer, size_t dst_offset,
@@ -38,9 +38,14 @@ void UploadQueue::upload_to_buffer(rhi::Buffer& buffer, size_t dst_offset,
   memcpy(alloc.cpu, data.data(), data.size());
   enc->copy_buffer_to_buffer(buffer, dst_offset, batch->buffer, curr_offset, data.size());
   device_->end_cmd_encoder(enc);
+  cmd_encoders_.push_back(enc);
+}
 
-  rhi::CmdEncoder* cmds[] = {enc};
-  device_->submit(cmds, batch->timeline);
+rhi::TimelinePoint UploadQueue::flush() {
+  timeline_.value++;
+  device_->submit(cmd_encoders_, {}, timeline_);
+  cmd_encoders_.clear();
+  return timeline_;
 }
 
 } // namespace gfx
