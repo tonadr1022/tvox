@@ -56,11 +56,13 @@ void Renderer::init(const InitInfo& info) {
   });
   upload_queue_.init(device_.get(), 64ull * 1024 * 1024, 3);
 
-  model_res = load_model("/Users/tony/personal/tvox/resources/models/Cube/glTF/Cube.gltf");
-
-  device_->create_timeline_semaphore(latest_completion_sema_.sema);
   texture_descriptor_index_allocator_.init(
       512); // TODO: don't hardcode this. might need to make desc heap public
+
+  model_res = load_model(*device_, upload_queue_, texture_descriptor_index_allocator_,
+                         "/Users/tony/personal/tvox/resources/models/Cube/glTF/Cube.gltf");
+
+  device_->create_timeline_semaphore(latest_completion_sema_.sema);
 
   {
     int w{}, h{};
@@ -169,11 +171,12 @@ void Renderer::render() {
     enc->begin_rendering(w, h, color_atts, &depth_att);
     enc->bind_pipeline(basic_);
     auto forward_root_data = frame_allocator->allocate<ForwardRoot>(1);
+    ASSERT(!model_res.textures.empty());
     *forward_root_data.cpu = ForwardRoot{
         .view_proj = glm::transpose(projection_matrix * view_matrix),
         .output_result = static_cast<float*>(test_gpu_allocation_buffer_.gpu_ptr),
         .vertices = reinterpret_cast<Vertex*>(vert_buf_.gpu_ptr),
-        .padding0 = 0,
+        .albedo_idx = model_res.textures[0].index,
     };
     enc->draw_indexed(forward_root_data.gpu, model_res.indices.size(), index_buf_);
     enc->end_rendering();
@@ -212,13 +215,16 @@ void Renderer::reload_shaders() {
         stats.failed);
   if (stats.failed > 0) {
     LERROR("shader ensure_all failed: {}", stats.first_error);
+    return;
   }
 
-  load_shader(basic_vs_, "basic_tri", ShaderType::Vertex);
-  load_shader(basic_fs_, "basic_tri", ShaderType::Fragment);
-  load_shader(basic_cs_, "basic", ShaderType::Compute);
-  load_shader(post_process_vs_, "post_process", ShaderType::Vertex);
-  load_shader(post_process_fs_, "post_process", ShaderType::Fragment);
+  if (!load_shader(basic_vs_, "basic_tri", ShaderType::Vertex) ||
+      !load_shader(basic_fs_, "basic_tri", ShaderType::Fragment) ||
+      !load_shader(basic_cs_, "basic", ShaderType::Compute) ||
+      !load_shader(post_process_vs_, "post_process", ShaderType::Vertex) ||
+      !load_shader(post_process_fs_, "post_process", ShaderType::Fragment)) {
+    return;
+  }
 
   device_->create_pipeline({.vertex_shader = &basic_vs_, .fragment_shader = &basic_fs_}, basic_);
   device_->create_pipeline(basic_cs_, basic_comp_pso_);
@@ -252,25 +258,27 @@ void Renderer::recreate_textures() {
                                  });
 }
 
-void Renderer::load_shader(Shader& shader, std::string_view technique, ShaderType stage) {
+bool Renderer::load_shader(Shader& shader, std::string_view technique, ShaderType stage) {
   const ShaderTechniqueDesc* tech = ShaderTechniqueRegistry::find(technique);
   FATAL_IF(!tech, "unknown technique '{}'", technique);
 
   const ShaderTechniqueDesc::StageDesc* stage_desc = find_stage(*tech, stage);
   if (!stage_desc) {
     LERROR("technique '{}' has no requested stage", technique);
-    return;
+    return false;
   }
 
   const auto bytes = shader_cache_->load_shader(technique, stage);
   if (!bytes) {
     LERROR("failed to load metallib for {} / {}: {}", technique, stage_desc->entry, bytes.error());
-    return;
+    return false;
   }
 
   if (!device_->create_shader(stage, bytes->data(), bytes->size(), shader, stage_desc->entry)) {
     LERROR("create_shader failed for {} / {}", technique, stage_desc->entry);
+    return false;
   }
+  return true;
 }
 
 } // namespace gfx

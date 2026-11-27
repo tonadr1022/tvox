@@ -85,8 +85,14 @@ private:
     NS::SharedPtr<MTL::TextureViewPool> tex_view_pool;
     NS::SharedPtr<MTL::Buffer> base_id_buf;
   } tex_desc_heap_;
-  constexpr static auto k_descriptor_heap_arg_table_index{1};
 
+  struct SamplerHeap {
+    std::vector<NS::SharedPtr<MTL::SamplerState>> samplers;
+    NS::SharedPtr<MTL::Buffer> resource_id_buf;
+  } sampler_heap_;
+
+  constexpr static auto k_descriptor_heap_arg_table_index{1};
+  constexpr static auto k_sampler_heap_arg_table_index{2};
   size_t frames_in_flight_{rhi::k_max_frames_in_flight};
 };
 

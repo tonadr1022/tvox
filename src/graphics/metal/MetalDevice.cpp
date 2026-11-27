@@ -16,6 +16,7 @@
 #include <Metal/MTLPixelFormat.hpp>
 #include <Metal/MTLResidencySet.hpp>
 #include <Metal/MTLResource.hpp>
+#include <Metal/MTLSampler.hpp>
 #include <Metal/MTLTexture.hpp>
 #include <QuartzCore/CAMetalLayer.hpp>
 #include <array>
@@ -28,6 +29,8 @@ MTL::PixelFormat to_metal_format(rhi::Format format) {
   switch (format) {
   case rhi::Format::Bgra8Unorm:
     return MTL::PixelFormatBGRA8Unorm;
+  case rhi::Format::Rgba8Unorm:
+    return MTL::PixelFormatRGBA8Unorm;
   case rhi::Format::D32Float:
     return MTL::PixelFormatDepth32Float;
   case rhi::Format::Rgba32Float:
@@ -55,7 +58,7 @@ MTL::TextureUsage to_metal(rhi::TextureUsage usage) {
   if (usage & rhi::TextureUsage::RenderTarget) {
     mtl_usage |= MTL::TextureUsageRenderTarget;
   }
-  if (usage & rhi::TextureUsage::RenderTarget) {
+  if (usage & rhi::TextureUsage::ShaderRead) {
     mtl_usage |= MTL::TextureUsageShaderRead;
   }
   if (usage & rhi::TextureUsage::ShaderWrite) {
@@ -118,6 +121,25 @@ void MetalDevice::init(const rhi::DeviceInitInfo& init_info) {
         &base_resource_id, sizeof(base_resource_id), MTL::ResourceStorageModeShared));
     make_resident(tex_desc_heap_.base_id_buf.get());
   }
+
+  {
+    size_t max_samplers = 16;
+    sampler_heap_.resource_id_buf = NS::TransferPtr(
+        device_->newBuffer(sizeof(MTL::ResourceID) * max_samplers, MTL::ResourceStorageModeShared));
+    make_resident(sampler_heap_.resource_id_buf.get());
+
+    auto sampler_desc = NS::TransferPtr(MTL::SamplerDescriptor::alloc()->init());
+    sampler_desc->setMipFilter(MTL::SamplerMipFilterLinear);
+    sampler_desc->setMinFilter(MTL::SamplerMinMagFilterLinear);
+    sampler_desc->setMagFilter(MTL::SamplerMinMagFilterLinear);
+    sampler_desc->setRAddressMode(MTL::SamplerAddressModeRepeat);
+    sampler_desc->setSAddressMode(MTL::SamplerAddressModeRepeat);
+    sampler_desc->setTAddressMode(MTL::SamplerAddressModeRepeat);
+    auto& sampler_state = sampler_heap_.samplers.emplace_back(
+        NS::TransferPtr(device_->newSamplerState(sampler_desc.get())));
+    auto* ids = static_cast<MTL::ResourceID*>(sampler_heap_.resource_id_buf->contents());
+    ids[sampler_heap_.samplers.size() - 1] = sampler_state->gpuResourceID();
+  }
 }
 
 void MetalDevice::create_swapchain(const rhi::SwapchainDesc& desc, SDL_Window* window,
@@ -171,6 +193,10 @@ bool MetalDevice::create_shader(rhi::ShaderType type, const void* data, uint64_t
     LOG_ASSERT(0, "{}", desc->utf8String());
     error->release();
     success = false;
+  }
+
+  if (!library) {
+    return false;
   }
 
   internal_data->library = library;
@@ -381,11 +407,13 @@ rhi::CmdEncoder* MetalDevice::begin_cmd_encoder(rhi::CmdPool& pool) {
     auto arg_table_desc = NS::TransferPtr(MTL4::ArgumentTableDescriptor::alloc()->init());
     arg_table_desc->setInitializeBindings(true);
     arg_table_desc->setLabel(NS::String::string("arg_table", NS::UTF8StringEncoding));
-    arg_table_desc->setMaxBufferBindCount(3);
+    arg_table_desc->setMaxBufferBindCount(5);
     NS::Error* error{};
     enc->arg_table_ = NS::TransferPtr(device_->newArgumentTable(arg_table_desc.get(), &error));
     enc->arg_table_->setAddress(tex_desc_heap_.base_id_buf->gpuAddress(),
                                 k_descriptor_heap_arg_table_index);
+    enc->arg_table_->setAddress(sampler_heap_.resource_id_buf->gpuAddress(),
+                                k_sampler_heap_arg_table_index);
     ASSERT(!error);
   }
 

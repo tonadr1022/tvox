@@ -35,8 +35,11 @@ public:
                 uint32_t thread_groups_z) override;
   void barrier(rhi::Stage before, rhi::Access before_access, rhi::Stage after,
                rhi::Access after_access) override;
-  void copy_buffer_to_buffer(rhi::Buffer& dst, size_t dst_offset, rhi::Buffer& src,
-                             size_t src_offset, size_t size) override;
+  void copy_buffer_to_buffer(rhi::Buffer& dst, uint32_t dst_offset, rhi::Buffer& src,
+                             uint32_t src_offset, uint32_t size) override;
+  void copy_texture_from_buffer(rhi::Texture& dst, uint32_t dst_slice, uint32_t dst_mip,
+                                rhi::Buffer& src, uint32_t src_offset, uint32_t bytes_per_row,
+                                glm::uvec3 src_size, glm::uvec3 dst_origin) override;
 
   NS::SharedPtr<MTL4::RenderCommandEncoder> curr_render_encoder_;
   NS::SharedPtr<MTL4::ComputeCommandEncoder> curr_compute_encoder_;

@@ -80,6 +80,7 @@ constexpr size_t k_max_frames_in_flight = 2;
 enum class Format : uint8_t {
   Unknown = 0,
   Bgra8Unorm,
+  Rgba8Unorm,
   Rgba32Float,
   D32Float,
 };

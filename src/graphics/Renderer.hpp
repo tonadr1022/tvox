@@ -1,5 +1,6 @@
 #pragma once
 
+#include "graphics/BindlessTexture.hpp"
 #include "graphics/rhi/Graphics.hpp"
 #include "graphics/shaders/ShaderCache.hpp"
 #include "graphics/util/BumpAllocator.hpp"
@@ -15,10 +16,6 @@ namespace gfx {
 namespace rhi {
 class Device;
 }
-
-struct BindlessTexture : rhi::Texture {
-  uint32_t index;
-};
 
 class Renderer {
 public:
@@ -36,7 +33,7 @@ private:
   void reload_shaders();
   void recreate_textures();
   /// Load a cooked metallib by logical technique id + stage (entry from registry).
-  void load_shader(rhi::Shader& shader, std::string_view technique, rhi::ShaderType stage);
+  bool load_shader(rhi::Shader& shader, std::string_view technique, rhi::ShaderType stage);
 
   SDL_Window* window_{};
   std::optional<ShaderCache> shader_cache_;

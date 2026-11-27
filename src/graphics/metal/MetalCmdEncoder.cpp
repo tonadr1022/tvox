@@ -309,13 +309,26 @@ void MetalCmdEncoder::flush_pending_barriers() {
   pending_barriers_.clear();
 }
 
-void MetalCmdEncoder::copy_buffer_to_buffer(rhi::Buffer& dst, size_t dst_offset, rhi::Buffer& src,
-                                            size_t src_offset, size_t size) {
+void MetalCmdEncoder::copy_buffer_to_buffer(rhi::Buffer& dst, uint32_t dst_offset, rhi::Buffer& src,
+                                            uint32_t src_offset, uint32_t size) {
   start_compute();
   auto* src_internal = to_internal(src);
   auto* dst_internal = to_internal(dst);
   curr_compute_encoder_->copyFromBuffer(src_internal->buffer.get(), src_offset,
                                         dst_internal->buffer.get(), dst_offset, size);
+}
+
+void MetalCmdEncoder::copy_texture_from_buffer(rhi::Texture& dst, uint32_t dst_slice,
+                                               uint32_t dst_mip, rhi::Buffer& src,
+                                               uint32_t src_offset, uint32_t bytes_per_row,
+                                               glm::uvec3 src_size, glm::uvec3 dst_origin) {
+  start_compute();
+  auto* src_internal = to_internal(src);
+  auto* dst_internal = to_internal(dst);
+  curr_compute_encoder_->copyFromBuffer(
+      src_internal->buffer.get(), src_offset, bytes_per_row, 0,
+      MTL::Size::Make(src_size.x, src_size.y, src_size.z), dst_internal->texture.get(), dst_slice,
+      dst_mip, MTL::Origin::Make(dst_origin.x, dst_origin.y, dst_origin.z));
 }
 
 } // namespace gfx::metal

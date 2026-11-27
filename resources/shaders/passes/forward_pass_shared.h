@@ -6,6 +6,7 @@ struct ForwardRoot {
   float4x4 view_proj;
   float* output_result;
   Vertex* vertices;
+  uint32_t albedo_idx;
   float padding0;
 };
 
